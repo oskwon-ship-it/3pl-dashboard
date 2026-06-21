@@ -486,17 +486,27 @@ if not hist_df.empty or not in_df.empty:
                     top_regions = region_summary.nlargest(15, '주문건수')
                     
                     fig_region = px.bar(top_regions, x='주문건수', y='지역(省)', orientation='h', color='주문건수', color_continuous_scale='Sunset')
-                    fig_region.update_layout(yaxis={'categoryorder':'total ascending'}, margin=dict(l=0, r=0, t=30, b=0))
-                    st.plotly_chart(fig_region, use_container_width=True)
+                    # 클릭 이벤트를 받아서 연동 (Streamlit 1.35 이상)
+                    region_event = st.plotly_chart(fig_region, use_container_width=True, on_select="rerun")
                     st.divider()
 
-                    st.markdown("### 🔍 특정 지역(省)의 인기 상품 분석")
+                    st.markdown("### 🔍 클릭한 지역의 인기 상품 분석")
                     unique_regions = sorted([r for r in valid_shop_detail['지역(省)'].unique() if pd.notna(r) and r != '미상'])
                     
                     if unique_regions:
-                        # 가장 주문이 많은 지역을 기본값으로 설정
+                        # 1순위: 사용자가 차트에서 클릭한 지역
+                        clicked_region = None
+                        if region_event and len(region_event.selection.points) > 0:
+                            clicked_region = region_event.selection.points[0]['y']
+                        
+                        # 2순위: 기본 지역 (가장 주문이 많은 지역)
                         default_region = top_regions.iloc[0]['지역(省)'] if not top_regions.empty and top_regions.iloc[0]['지역(省)'] != '미상' else unique_regions[0]
-                        selected_region = st.selectbox("📌 분석할 지역(省)을 선택하세요:", unique_regions, index=unique_regions.index(default_region) if default_region in unique_regions else 0)
+                        
+                        # 클릭된 지역이 있으면 그 지역을 현재 선택된 지역으로 지정
+                        current_region = clicked_region if clicked_region in unique_regions else default_region
+                        current_index = unique_regions.index(current_region)
+                        
+                        selected_region = st.selectbox("👆 위 차트에서 막대를 클릭하거나 아래에서 지역을 선택하세요:", unique_regions, index=current_index)
                         
                         region_data = valid_shop_detail[valid_shop_detail['지역(省)'] == selected_region]
                         
