@@ -387,7 +387,8 @@ if not hist_df.empty or not in_df.empty:
                         fig_month.update_xaxes(type='category')
                         st.plotly_chart(fig_month, use_container_width=True)
                     with t2:
-                        fig_day = px.line(trend_all, x='날짜', y=['접수건수', '출고건수(완료)'], markers=True)
+                        fig_day = px.bar(trend_all, x='날짜', y=['접수건수', '출고건수(완료)'], barmode='group')
+                        fig_day.update_layout(margin=dict(l=0, r=0, t=30, b=0))
                         fig_day = apply_korean_date_format(fig_day)
                         st.plotly_chart(fig_day, use_container_width=True)
                     
