@@ -488,6 +488,35 @@ if not hist_df.empty or not in_df.empty:
                     fig_region = px.bar(top_regions, x='주문건수', y='지역(省)', orientation='h', color='주문건수', color_continuous_scale='Sunset')
                     fig_region.update_layout(yaxis={'categoryorder':'total ascending'}, margin=dict(l=0, r=0, t=30, b=0))
                     st.plotly_chart(fig_region, use_container_width=True)
+                    st.divider()
+
+                    st.markdown("### 🔍 특정 지역(省)의 인기 상품 분석")
+                    unique_regions = sorted([r for r in valid_shop_detail['지역(省)'].unique() if pd.notna(r) and r != '미상'])
+                    
+                    if unique_regions:
+                        # 가장 주문이 많은 지역을 기본값으로 설정
+                        default_region = top_regions.iloc[0]['지역(省)'] if not top_regions.empty and top_regions.iloc[0]['지역(省)'] != '미상' else unique_regions[0]
+                        selected_region = st.selectbox("📌 분석할 지역(省)을 선택하세요:", unique_regions, index=unique_regions.index(default_region) if default_region in unique_regions else 0)
+                        
+                        region_data = valid_shop_detail[valid_shop_detail['지역(省)'] == selected_region]
+                        
+                        if not region_data.empty and '货品简称' in region_data.columns:
+                            region_data['상품명'] = region_data.apply(
+                                lambda row: str(row['货品简称']) if pd.notna(row['货品简称']) and str(row['货品简称']).strip() != '' else str(row.get('货品编号', '이름없음')),
+                                axis=1
+                            )
+                            qty_col = '数量' if '数量' in region_data.columns else '货品总数量'
+                            
+                            region_prod_summary = region_data.groupby('상품명')[qty_col].sum().reset_index(name='출고수량')
+                            top_reg_prods = region_prod_summary.nlargest(10, '출고수량')
+                            
+                            fig_reg_prod = px.bar(top_reg_prods, x='출고수량', y='상품명', orientation='h', color='출고수량', color_continuous_scale='Teal', text_auto=True)
+                            fig_reg_prod.update_layout(yaxis={'categoryorder':'total ascending'}, margin=dict(l=0, r=0, t=30, b=0))
+                            st.plotly_chart(fig_reg_prod, use_container_width=True)
+                            
+                            st.dataframe(top_reg_prods, use_container_width=True, hide_index=True)
+                        else:
+                            st.info("해당 지역의 상세 상품 데이터가 없습니다.")
                 
             else:
                 st.write("👆 **위 드롭다운 메뉴에서 상점을 선택하시면 세부 데이터(브랜드, 상품 등)가 나타납니다.**")
