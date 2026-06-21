@@ -27,7 +27,7 @@ def load_data():
     use_cols = [
         '出库单号', '审核时间', '店铺', '客服备注', '发货状态', '发货时间', '货品数量',
         '客户网名', '品牌', '货品简称', '货品总数量', '货品编号', '数量', '绩效箱数', 
-        '货主', '入库单号', '入库原因'
+        '货主', '入库单号', '入库原因', '省市区'
     ]
     def col_filter(c):
         return c in use_cols
@@ -61,7 +61,7 @@ def load_data():
         if '出库单号' in hist_df.columns and '出库单号' in detail_df.columns:
             hist_unique = hist_df.drop_duplicates(subset=['出库单号'])
             merge_cols = ['出库单号']
-            for col in ['审核时间', '店铺', '客服备注']:
+            for col in ['审核时间', '店铺', '客服备注', '省市区']:
                 if col in hist_unique.columns:
                     merge_cols.append(col)
                     if col in detail_df.columns:
@@ -472,6 +472,21 @@ if not hist_df.empty or not in_df.empty:
                         
                         # 표 형태로도 데이터 제공
                         st.dataframe(brand_item_summary.rename(columns={'상품표시명':'상품명', '货品总数量':'출고수량(개)'}), use_container_width=True, hide_index=True)
+                        st.divider()
+
+                # 6. 지역별 배송 목적지 현황
+                if not valid_shop_detail.empty and '省市区' in valid_shop_detail.columns:
+                    st.markdown("## 6️⃣ 지역별 배송 현황 (Top 15)")
+                    
+                    # '广东省 深圳市 남산구' 형태에서 첫 번째 '广东省'만 추출
+                    valid_shop_detail['지역(省)'] = valid_shop_detail['省市区'].apply(lambda x: str(x).split()[0] if pd.notna(x) and str(x).strip() != '' else '미상')
+                    
+                    region_summary = valid_shop_detail.drop_duplicates(subset=['出库单号']).groupby('지역(省)').size().reset_index(name='주문건수')
+                    top_regions = region_summary.nlargest(15, '주문건수')
+                    
+                    fig_region = px.bar(top_regions, x='주문건수', y='지역(省)', orientation='h', color='주문건수', color_continuous_scale='Sunset')
+                    fig_region.update_layout(yaxis={'categoryorder':'total ascending'}, margin=dict(l=0, r=0, t=30, b=0))
+                    st.plotly_chart(fig_region, use_container_width=True)
                 
             else:
                 st.write("👆 **위 드롭다운 메뉴에서 상점을 선택하시면 세부 데이터(브랜드, 상품 등)가 나타납니다.**")
