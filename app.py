@@ -335,6 +335,12 @@ if not hist_df.empty or not in_df.empty:
                 dispatched_mask = ~cancel_mask & ~pending_mask
                 dispatched_count = int(dispatched_mask.sum())
                 
+                # 지연 출고(Delayed) 판단: 출고는 완료되었으나 접수일자보다 늦게 발송된 경우
+                delayed_mask = pd.Series(False, index=shop_hist.index)
+                if '发货일자' in shop_hist.columns and '접수일자' in shop_hist.columns:
+                    delayed_mask = dispatched_mask & (shop_hist['发货일자'] > shop_hist['접수일자'])
+                delayed_count = int(delayed_mask.sum())
+                
                 if '出库单号' in shop_hist.columns:
                     valid_order_ids = shop_hist.loc[dispatched_mask, '出库单号'].unique()
                     valid_shop_detail = shop_detail[shop_detail['出库单号'].isin(valid_order_ids)] if not shop_detail.empty else shop_detail
@@ -351,7 +357,8 @@ if not hist_df.empty or not in_df.empty:
                 kpi2.metric("출고 완료", f"{dispatched_count:,.0f} 건")
                 kpi3.metric("총 발송수량", f"{total_qty:,.0f} 개")
                 kpi4.metric("주문 취소", f"{canceled_count:,.0f} 건")
-                kpi5.metric("미출고/지연", f"{pending_count:,.0f} 건")
+                kpi5.metric("미출고 (발송대기)", f"{pending_count:,.0f} 건")
+                kpi6.metric("지연 출고 (익일이후)", f"{delayed_count:,.0f} 건")
                 
                 st.divider()
                 
