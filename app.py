@@ -104,7 +104,7 @@ def load_data():
         if '货品总数量' in detail_df.columns:
             detail_df['货品总数量'] = pd.to_numeric(detail_df['货品总数量'], errors='coerce').fillna(0)
             
-    col_filter = ['入库单号', '仓库', '货主', '货品编号', '货品简称', '申请单号', '数量', '绩效箱数', '审核时间']
+    col_filter = ['入库单号', '仓库', '货主', '货品编号', '货品简称', '申请单号', '数量', '绩效箱数', '审核时间', '入库原因', '品牌']
     inbound_files = glob.glob(os.path.join("data_inbound", "*.xlsx"))
     
     # 6. 입고 내역 로드
