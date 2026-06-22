@@ -193,10 +193,9 @@ if not hist_df.empty or not in_df.empty:
         curr_hist_df = hist_df[(hist_df['접수일자'] >= start_date) & (hist_df['접수일자'] <= end_date)] if not hist_df.empty and '접수일자' in hist_df.columns else pd.DataFrame()
         curr_detail_df = detail_df[(detail_df['접수일자'] >= start_date) & (detail_df['접수일자'] <= end_date)] if not detail_df.empty and '접수일자' in detail_df.columns else pd.DataFrame()
 
-        # 전 기간(비교용) 필터링
-        duration = (end_date - start_date).days + 1
-        prev_end_date = start_date - datetime.timedelta(days=1)
-        prev_start_date = prev_end_date - datetime.timedelta(days=duration - 1)
+        # 전 기간(비교용) 필터링 (전월 동일 날짜 기준)
+        prev_start_date = (pd.to_datetime(start_date) - pd.DateOffset(months=1)).date()
+        prev_end_date = (pd.to_datetime(end_date) - pd.DateOffset(months=1)).date()
         
         prev_in_df = in_df[(in_df['입고일자'] >= prev_start_date) & (in_df['입고일자'] <= prev_end_date)] if not in_df.empty and '입고일자' in in_df.columns else pd.DataFrame()
         prev_hist_df = hist_df[(hist_df['접수일자'] >= prev_start_date) & (hist_df['접수일자'] <= prev_end_date)] if not hist_df.empty and '접수일자' in hist_df.columns else pd.DataFrame()
@@ -216,10 +215,10 @@ if not hist_df.empty or not in_df.empty:
         prev_out_qty = prev_detail_df['货品总数量'].sum() if not prev_detail_df.empty and '货品总数量' in prev_detail_df.columns else 0
 
         kpi1, kpi2, kpi3, kpi4 = st.columns(4)
-        kpi1.metric("📦 총 입고 수량", f"{total_in_qty:,.0f} 개", f"{total_in_qty - prev_in_qty:,.0f} 개 (직전 동기간 대비)")
-        kpi2.metric("📦 총 입고 박스", f"{total_in_box:,.1f} Box", f"{total_in_box - prev_in_box:,.1f} Box (직전 동기간 대비)")
-        kpi3.metric("🚀 총 출고 주문건수", f"{total_out_orders:,.0f} 건", f"{total_out_orders - prev_out_orders:,.0f} 건 (직전 동기간 대비)")
-        kpi4.metric("🚀 총 출고 수량", f"{total_out_qty:,.0f} 개", f"{total_out_qty - prev_out_qty:,.0f} 개 (직전 동기간 대비)")
+        kpi1.metric("📦 총 입고 수량", f"{total_in_qty:,.0f} 개", f"{total_in_qty - prev_in_qty:,.0f} 개 (전월 동기간 대비)")
+        kpi2.metric("📦 총 입고 박스", f"{total_in_box:,.1f} Box", f"{total_in_box - prev_in_box:,.1f} Box (전월 동기간 대비)")
+        kpi3.metric("🚀 총 출고 주문건수", f"{total_out_orders:,.0f} 건", f"{total_out_orders - prev_out_orders:,.0f} 건 (전월 동기간 대비)")
+        kpi4.metric("🚀 총 출고 수량", f"{total_out_qty:,.0f} 개", f"{total_out_qty - prev_out_qty:,.0f} 개 (전월 동기간 대비)")
         
         st.divider()
         
