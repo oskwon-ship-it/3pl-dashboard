@@ -175,11 +175,11 @@ if not hist_df.empty or not in_df.empty:
         ikpi1, ikpi2 = st.columns(2)
         ikpi3, ikpi4 = st.columns(2)
         
-        total_in_orders = in_df['入库单号'].nunique() if '入库单号' in in_df.columns else 0
+        total_in_skus = len(in_df)
         total_in_qty = in_df['数量'].sum() if '数量' in in_df.columns else 0
         total_in_box = in_df['绩效箱数'].sum() if '绩效箱数' in in_df.columns else 0
         
-        ikpi1.metric("총 입고 건수", f"{total_in_orders:,.0f} 건")
+        ikpi1.metric("총 입고 품목 수", f"{total_in_skus:,.0f} 건")
         ikpi2.metric("총 입고 수량", f"{total_in_qty:,.0f} 개")
         ikpi3.metric("총 입고 박스 수", f"{total_in_box:,.1f} Box")
         st.divider()
