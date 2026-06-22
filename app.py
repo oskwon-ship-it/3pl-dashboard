@@ -27,7 +27,7 @@ def get_data_hash():
 def load_data(data_hash):
     detailed_files = glob.glob("data_detailed/*.csv") + glob.glob("data_detailed/*.xlsx") + glob.glob("data_detailed/*.xls")
     history_files = glob.glob("data_history/*.csv") + glob.glob("data_history/*.xlsx") + glob.glob("data_history/*.xls")
-    inbound_files = glob.glob("data_inbound/*.csv") + glob.glob("data_inbound/*.xlsx") + glob.glob("data_inbound/*.xls")
+    inbound_files = glob.glob("data_inbound/*.xlsx") + glob.glob("data_inbound/*.xls")
     cj_files = glob.glob("data_outbound_cj/*.csv") + glob.glob("data_outbound_cj/*.xlsx") + glob.glob("data_outbound_cj/*.xls")
     quick_files = glob.glob("data_outbound_quick/*.csv") + glob.glob("data_outbound_quick/*.xlsx") + glob.glob("data_outbound_quick/*.xls")
     
@@ -37,52 +37,133 @@ def load_data(data_hash):
         '客户网名', '品牌', '货品简称', '货品总数量', '货品编号', '数量', '绩效箱数', 
         '货主', '入库单号', '入库原因', '省市区'
     ]
-    
-    def read_df(file_path, filter_cols=False):
-        try:
-            # 중복 방지: 동일한 이름의 .csv가 있으면 .xlsx는 무시
-            if not file_path.endswith('.csv'):
-                csv_equivalent = os.path.splitext(file_path)[0] + '.csv'
-                if os.path.exists(csv_equivalent):
-                    return None
-                    
-            if file_path.endswith('.csv'):
-                if filter_cols:
-                    return pd.read_csv(file_path, usecols=lambda c: c in use_cols)
-                return pd.read_csv(file_path)
-            else:
-                engine = 'openpyxl' if file_path.endswith('.xlsx') else None
-                if filter_cols:
-                    return pd.read_excel(file_path, usecols=lambda c: c in use_cols, engine=engine)
-                return pd.read_excel(file_path, engine=engine)
-        except Exception as e:
-            st.warning(f"파일 읽기 오류 ({file_path}): {e}")
-            return None
+    def col_filter(c):
+        return c in use_cols
 
     # 1. 출고 내역(History) 로드
-    history_list = [read_df(f, True) for f in history_files if "~$" not in f]
-    history_list = [df for df in history_list if df is not None]
+    history_list = []
+    for file in history_files:
+        if "~$" in file: continue
+        try:
+            if not file.endswith('.csv'):
+                csv_file = os.path.splitext(file)[0] + '.csv'
+                if os.path.exists(csv_file): continue
+            
+            if file.endswith('.csv'):
+                temp_df = pd.read_csv(file, on_bad_lines='skip', low_memory=False)
+                temp_df = temp_df[[c for c in use_cols if c in temp_df.columns]]
+            else:
+                engine = 'openpyxl' if file.endswith('.xlsx') else None
+                temp_df = pd.read_excel(file, usecols=col_filter, engine=engine)
+            history_list.append(temp_df)
+        except Exception as e:
+            st.warning(f"출고내역 '{file}' 오류: {e}")
+            
     hist_df = pd.concat(history_list, ignore_index=True) if history_list else pd.DataFrame()
         
     # 2. 상세 출고 내역(Detailed) 로드
-    df_list = [read_df(f, True) for f in detailed_files if "~$" not in f]
-    df_list = [df for df in df_list if df is not None]
+    df_list = []
+    for file in detailed_files:
+        if "~$" in file: continue
+        try:
+            if not file.endswith('.csv'):
+                csv_file = os.path.splitext(file)[0] + '.csv'
+                if os.path.exists(csv_file): continue
+            
+            if file.endswith('.csv'):
+                temp_df = pd.read_csv(file, on_bad_lines='skip', low_memory=False)
+                temp_df = temp_df[[c for c in use_cols if c in temp_df.columns]]
+            else:
+                engine = 'openpyxl' if file.endswith('.xlsx') else None
+                temp_df = pd.read_excel(file, usecols=col_filter, engine=engine)
+            df_list.append(temp_df)
+        except Exception as e:
+            st.warning(f"상세 파일 '{file}' 오류: {e}")
+            
     detail_df = pd.concat(df_list, ignore_index=True) if df_list else pd.DataFrame()
         
     # 3. 마스터 데이터를 상세 내역에 병합
-    if not detail_df.empty and not hist_df.empty and '出库单号' in detail_df.columns and '出库单号' in hist_df.columns:
-        hist_subset = hist_df[['出库单号', '发货状态', '发货时间', '快递公司', '店铺', '省市区']].drop_duplicates('出库单号')
-        detail_df = pd.merge(detail_df, hist_subset, on='出库单号', how='left')
+    if not hist_df.empty and not detail_df.empty:
+        if '出库单号' in hist_df.columns and '出库单号' in detail_df.columns:
+            hist_unique = hist_df.drop_duplicates(subset=['出库单号'])
+            merge_cols = ['出库单号']
+            for col in ['审核时间', '店铺', '客服备注', '省市区']:
+                if col in hist_unique.columns:
+                    merge_cols.append(col)
+                    if col in detail_df.columns:
+                        detail_df = detail_df.drop(columns=[col])
+            detail_df = detail_df.merge(hist_unique[merge_cols], on='出库单号', how='left')
 
+    # 4. 상점명 통합 처리
+    if not hist_df.empty and '店铺' in hist_df.columns:
+        def merge_shop(s):
+            s_str = str(s).strip().lower()
+            if 'xiaohongshu' in s_str or 'taofenxiao' in s_str or 'haul41' in s_str or '샤오홍수' in s_str:
+                return 'B2C'
+            if 'wholesale' in s_str:
+                return 'BOX_Korea'
+            if 'sample' in s_str:
+                return 'EA_Sample'
+            return str(s).strip()
+        hist_df['店铺'] = hist_df['店铺'].apply(merge_shop)
+        if not detail_df.empty and '店铺' in detail_df.columns:
+            detail_df['店铺'] = detail_df['店铺'].apply(merge_shop)
+
+    # 5. 날짜 전처리
+    if not hist_df.empty:
+        if '审核时间' in hist_df.columns:
+            hist_df['접수시간'] = pd.to_datetime(hist_df['审核时间'], errors='coerce')
+            hist_df['접수일자'] = hist_df['접수시간'].dt.date
+        if '发货时间' in hist_df.columns:
+            temp_time = hist_df['发货时间'].astype(str).replace('0000-00-00 00:00:00', pd.NaT).replace('0000-00-00', pd.NaT)
+            hist_df['发货시간'] = pd.to_datetime(temp_time, errors='coerce')
+            hist_df['发货일자'] = hist_df['发货시간'].dt.date
+            
+    if not detail_df.empty:
         if '审核时间' in detail_df.columns:
             detail_df['접수시간'] = pd.to_datetime(detail_df['审核时间'], errors='coerce')
             detail_df['접수일자'] = detail_df['접수시간'].dt.date
+        if '发货时间' in detail_df.columns:
+            detail_df['发货시간'] = pd.to_datetime(detail_df['发货时间'], errors='coerce')
+            detail_df['发货일자'] = detail_df['发货시간'].dt.date
+        if '货品总数量' in detail_df.columns:
+            detail_df['货品总数量'] = pd.to_numeric(detail_df['货品总数量'], errors='coerce').fillna(0)
             
-    # 4. 입고 내역 로드
-    in_list = [read_df(f, True) for f in inbound_files if "~$" not in f]
-    in_list = [df for df in in_list if df is not None]
+    col_filter = ['入库单号', '仓库', '货主', '货品编号', '货品简称', '申请单号', '数量', '绩效箱数', '审核时间', '入库原因', '品牌']
+    inbound_files = glob.glob(os.path.join("data_inbound", "*.csv")) + glob.glob(os.path.join("data_inbound", "*.xlsx"))
     
+    # 6. 입고 내역 로드
+    # Force cache clear for user's new 2월 file v2
+    in_list = []
+    import re
+    for file in inbound_files:
+        if "~$" in file: continue
+        try:
+            if not file.endswith('.csv'):
+                csv_file = os.path.splitext(file)[0] + '.csv'
+                if os.path.exists(csv_file): continue
+                
+            if file.endswith('.csv'):
+                temp_df = pd.read_csv(file)
+            else:
+                engine = 'openpyxl' if file.endswith('.xlsx') else None
+                temp_df = pd.read_excel(file, engine=engine)
+            temp_df = temp_df[[c for c in col_filter if c in temp_df.columns]]
+            
+            # 파일명에서 몇 월 데이터인지 추출 (예: '1월' -> 1)
+            match = re.search(r'(\d+)월', file)
+            if match and '审核时间' in temp_df.columns:
+                file_month = int(match.group(1))
+                # 审核时间이 해당 파일의 월과 일치하는 데이터만 남김 (월별 중복 다운로드 방지)
+                temp_time = pd.to_datetime(temp_df['审核时间'], errors='coerce')
+                temp_df = temp_df[temp_time.dt.month == file_month]
+                
+            in_list.append(temp_df)
+        except Exception as e:
+            st.warning(f"입고 파일 '{file}' 오류: {e}")
+            
     in_df = pd.concat(in_list, ignore_index=True) if in_list else pd.DataFrame()
+    
     if not in_df.empty:
         if '审核时间' in in_df.columns:
             in_df['입고시간'] = pd.to_datetime(in_df['审核时间'], errors='coerce')
@@ -91,15 +172,40 @@ def load_data(data_hash):
             if col in in_df.columns:
                 in_df[col] = pd.to_numeric(in_df[col], errors='coerce').fillna(0)
                 
-    # 5. CJ 및 Quick 로드
-    cj_list = [read_df(f, False) for f in cj_files if "~$" not in f]
-    cj_list = [df for df in cj_list if df is not None]
+    cj_list = []
+    for file in cj_files:
+        if "~$" in file: continue
+        try:
+            if not file.endswith('.csv'):
+                csv_file = os.path.splitext(file)[0] + '.csv'
+                if os.path.exists(csv_file): continue
+                
+            if file.endswith('.csv'):
+                temp_df = pd.read_csv(file)
+            else:
+                temp_df = pd.read_excel(file, engine='openpyxl' if file.endswith('.xlsx') else None)
+            cj_list.append(temp_df)
+        except: pass
+        
     cj_df = pd.concat(cj_list, ignore_index=True) if cj_list else pd.DataFrame()
     if not cj_df.empty and '집화일자' in cj_df.columns:
         cj_df['집화일자'] = pd.to_datetime(cj_df['집화일자'], errors='coerce').dt.date
         
-    qk_list = [read_df(f, False) for f in quick_files if "~$" not in f]
-    qk_list = [df for df in qk_list if df is not None]
+    qk_list = []
+    for file in quick_files:
+        if "~$" in file: continue
+        try:
+            if not file.endswith('.csv'):
+                csv_file = os.path.splitext(file)[0] + '.csv'
+                if os.path.exists(csv_file): continue
+                
+            if file.endswith('.csv'):
+                temp_df = pd.read_csv(file)
+            else:
+                temp_df = pd.read_excel(file, engine='openpyxl' if file.endswith('.xlsx') else None)
+            qk_list.append(temp_df)
+        except: pass
+        
     qk_df = pd.concat(qk_list, ignore_index=True) if qk_list else pd.DataFrame()
     if not qk_df.empty and '오더일자' in qk_df.columns:
         qk_df['오더일자'] = pd.to_datetime(qk_df['오더일자'], errors='coerce').dt.date
