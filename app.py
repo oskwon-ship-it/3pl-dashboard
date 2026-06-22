@@ -18,8 +18,13 @@ def apply_korean_date_format(fig):
     )
     return fig
 
+def get_data_hash():
+    import os, glob
+    files = glob.glob('data_*/*.xlsx') + glob.glob('data_*/*.xls')
+    return sum(os.path.getmtime(f) for f in files)
+
 @st.cache_data(ttl=3600)  # 1시간 단위 캐시 갱신 추가
-def load_data():
+def load_data(data_hash):
     detailed_files = glob.glob("data_detailed/*.xlsx") + glob.glob("data_detailed/*.xls")
     history_files = glob.glob("data_history/*.xlsx") + glob.glob("data_history/*.xls")
     inbound_files = glob.glob("data_inbound/*.xlsx") + glob.glob("data_inbound/*.xls")
@@ -141,7 +146,7 @@ def load_data():
                 
     return hist_df, detail_df, in_df
 
-hist_df, detail_df, in_df = load_data()
+hist_df, detail_df, in_df = load_data(get_data_hash())
 
 if not hist_df.empty or not in_df.empty:
     with st.expander("⚙️ 3PL 대시보드 메뉴 및 설정 (여기를 눌러 필터를 변경하세요)", expanded=True):
