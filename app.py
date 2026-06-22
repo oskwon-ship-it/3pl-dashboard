@@ -232,23 +232,23 @@ if not hist_df.empty or not in_df.empty:
                 in_trend = curr_in_df.groupby('입고일자')['数量'].sum().reset_index().rename(columns={'입고일자': '일자', '数量': '입고수량'})
             
             out_trend = pd.DataFrame()
-            if not curr_hist_df.empty and '접수일자' in curr_hist_df.columns:
-                out_trend = curr_hist_df.groupby('접수일자').size().reset_index(name='출고주문건수').rename(columns={'접수일자': '일자'})
+            if not curr_detail_df.empty and '접수일자' in curr_detail_df.columns and '货品总数量' in curr_detail_df.columns:
+                out_trend = curr_detail_df.groupby('접수일자')['货品总数量'].sum().reset_index().rename(columns={'접수일자': '일자', '货品总数量': '출고수량'})
             
             if not in_trend.empty and not out_trend.empty:
                 trend_df = pd.merge(in_trend, out_trend, on='일자', how='outer').fillna(0).sort_values('일자')
             elif not in_trend.empty:
                 trend_df = in_trend.copy()
-                trend_df['출고주문건수'] = 0
+                trend_df['출고수량'] = 0
             elif not out_trend.empty:
                 trend_df = out_trend.copy()
                 trend_df['입고수량'] = 0
             else:
-                trend_df = pd.DataFrame(columns=['일자', '입고수량', '출고주문건수'])
+                trend_df = pd.DataFrame(columns=['일자', '입고수량', '출고수량'])
                 
             if not trend_df.empty:
                 import plotly.express as px
-                fig_trend = px.line(trend_df, x='일자', y=['입고수량', '출고주문건수'], markers=True, title="일자별 물동량 추이")
+                fig_trend = px.line(trend_df, x='일자', y=['입고수량', '출고수량'], markers=True, title="일자별 입/출고 수량 추이")
                 st.plotly_chart(fig_trend, use_container_width=True)
             else:
                 st.info("데이터가 부족하여 트렌드를 표시할 수 없습니다.")
@@ -292,7 +292,7 @@ if not hist_df.empty or not in_df.empty:
         st.markdown("### 📊 최근 6개월 월별 트렌드 (입출고 통합 비교)")
         # Group all data (unfiltered by date_range, to show historical months) by Month
         in_monthly = in_df.copy() if not in_df.empty else pd.DataFrame()
-        out_monthly = hist_df.copy() if not hist_df.empty else pd.DataFrame()
+        out_monthly = detail_df.copy() if not detail_df.empty else pd.DataFrame()
         
         if not in_monthly.empty and '입고일자' in in_monthly.columns:
             in_monthly['월'] = pd.to_datetime(in_monthly['입고일자']).dt.to_period('M').astype(str)
@@ -300,17 +300,17 @@ if not hist_df.empty or not in_df.empty:
         else:
             in_m_trend = pd.DataFrame(columns=['월', '입고수량'])
             
-        if not out_monthly.empty and '접수일자' in out_monthly.columns:
+        if not out_monthly.empty and '접수일자' in out_monthly.columns and '货品总数量' in out_monthly.columns:
             out_monthly['월'] = pd.to_datetime(out_monthly['접수일자']).dt.to_period('M').astype(str)
-            out_m_trend = out_monthly.groupby('월').size().reset_index(name='출고주문건수')
+            out_m_trend = out_monthly.groupby('월')['货品总数量'].sum().reset_index().rename(columns={'货品总数量': '출고수량'})
         else:
-            out_m_trend = pd.DataFrame(columns=['월', '출고주문건수'])
+            out_m_trend = pd.DataFrame(columns=['월', '출고수량'])
             
         if not in_m_trend.empty and not out_m_trend.empty:
             m_trend_df = pd.merge(in_m_trend, out_m_trend, on='월', how='outer').fillna(0).sort_values('월').tail(6)
         elif not in_m_trend.empty:
             m_trend_df = in_m_trend.sort_values('월').tail(6)
-            m_trend_df['출고주문건수'] = 0
+            m_trend_df['출고수량'] = 0
         elif not out_m_trend.empty:
             m_trend_df = out_m_trend.sort_values('월').tail(6)
             m_trend_df['입고수량'] = 0
@@ -323,10 +323,10 @@ if not hist_df.empty or not in_df.empty:
             
             fig_mom = make_subplots(specs=[[{"secondary_y": True}]])
             fig_mom.add_trace(go.Bar(x=m_trend_df['월'], y=m_trend_df['입고수량'], name='입고 수량(개)', opacity=0.7), secondary_y=False)
-            fig_mom.add_trace(go.Scatter(x=m_trend_df['월'], y=m_trend_df['출고주문건수'], name='출고 주문(건)', mode='lines+markers+text', text=m_trend_df['출고주문건수'], textposition='top center', line=dict(color='red', width=3)), secondary_y=True)
-            fig_mom.update_layout(title="최근 6개월 입고 수량 및 출고 주문건수 비교", barmode='group')
+            fig_mom.add_trace(go.Scatter(x=m_trend_df['월'], y=m_trend_df['출고수량'], name='출고 수량(개)', mode='lines+markers+text', text=m_trend_df['출고수량'], textposition='top center', line=dict(color='red', width=3)), secondary_y=True)
+            fig_mom.update_layout(title="최근 6개월 입고 수량 및 출고 수량 비교", barmode='group')
             fig_mom.update_yaxes(title_text="입고 수량", secondary_y=False)
-            fig_mom.update_yaxes(title_text="출고 주문건수", secondary_y=True)
+            fig_mom.update_yaxes(title_text="출고 수량", secondary_y=True)
             st.plotly_chart(fig_mom, use_container_width=True)
         else:
             st.info("데이터가 부족하여 월별 트렌드를 표시할 수 없습니다.")
