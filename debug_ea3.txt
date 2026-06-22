@@ -1,0 +1,3 @@
+May Audit Orders in History: 6712
+Total Orders in Detailed: 14753
+Missing Orders (in History May, but NOT in Detailed): 0

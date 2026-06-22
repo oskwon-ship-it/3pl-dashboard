@@ -1,0 +1,1 @@
+Sum after dropping duplicates: 3351.0
