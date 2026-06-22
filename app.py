@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import glob
+import os
 
 st.set_page_config(page_title="3PL 맞춤형 대시보드", page_icon="📦", layout="wide")
 
@@ -103,12 +104,27 @@ def load_data():
         if '货品总数量' in detail_df.columns:
             detail_df['货品总数量'] = pd.to_numeric(detail_df['货品总数量'], errors='coerce').fillna(0)
             
+    col_filter = ['入库单号', '仓库', '货主', '货品编号', '货品简称', '申请单号', '数量', '绩效箱数', '审核时间']
+    inbound_files = glob.glob(os.path.join("data_inbound", "*.xlsx"))
+    
     # 6. 입고 내역 로드
+    # Force cache clear for user's new 2월 file v2
     in_list = []
+    import re
     for file in inbound_files:
         if "~$" in file: continue
         try:
-            temp_df = pd.read_excel(file, usecols=col_filter)
+            temp_df = pd.read_excel(file)
+            temp_df = temp_df[[c for c in col_filter if c in temp_df.columns]]
+            
+            # 파일명에서 몇 월 데이터인지 추출 (예: '1월' -> 1)
+            match = re.search(r'(\d+)월', file)
+            if match and '审核时间' in temp_df.columns:
+                file_month = int(match.group(1))
+                # 审核时间이 해당 파일의 월과 일치하는 데이터만 남김 (월별 중복 다운로드 방지)
+                temp_time = pd.to_datetime(temp_df['审核时间'], errors='coerce')
+                temp_df = temp_df[temp_time.dt.month == file_month]
+                
             in_list.append(temp_df)
         except Exception as e:
             st.warning(f"입고 파일 '{file}' 오류: {e}")
@@ -116,9 +132,6 @@ def load_data():
     in_df = pd.concat(in_list, ignore_index=True) if in_list else pd.DataFrame()
     
     if not in_df.empty:
-        # 중복 데이터 제거 (완전히 동일한 행만 제거하여 부분 입고 누락 방지)
-        in_df = in_df.drop_duplicates(keep='first')
-        
         if '审核时间' in in_df.columns:
             in_df['입고시간'] = pd.to_datetime(in_df['审核时间'], errors='coerce')
             in_df['입고일자'] = in_df['입고시간'].dt.date
