@@ -161,6 +161,91 @@ if not hist_df.empty or not in_df.empty:
                 "어떤 용도의 대시보드를 보시겠습니까?",
                 ('💼 고객사 배포용 (Client View)', '👑 대표님 보고용 (Internal View)')
             )
+            
+    if view_mode == '👑 대표님 보고용 (Internal View)':
+        st.title("👑 3PL 종합 운영 리포트 (Internal View)")
+        st.markdown("### 📊 센터 전체 핵심 KPI (전체 기간 통합)")
+        
+        # Calculate KPIs
+        total_in_qty = in_df['数量'].sum() if not in_df.empty and '数量' in in_df.columns else 0
+        total_in_box = in_df['绩效箱数'].sum() if not in_df.empty and '绩效箱数' in in_df.columns else 0
+        
+        total_out_orders = len(hist_df) if not hist_df.empty else 0
+        total_out_qty = detail_df['货品总数量'].sum() if not detail_df.empty and '货品总数量' in detail_df.columns else 0
+        
+        kpi1, kpi2, kpi3, kpi4 = st.columns(4)
+        kpi1.metric("📦 총 입고 수량", f"{total_in_qty:,.0f} 개")
+        kpi2.metric("📦 총 입고 박스", f"{total_in_box:,.1f} Box")
+        kpi3.metric("🚀 총 출고 주문건수", f"{total_out_orders:,.0f} 건")
+        kpi4.metric("🚀 총 출고 수량", f"{total_out_qty:,.0f} 개")
+        
+        st.divider()
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("### 📈 일별 입/출고 수량 트렌드")
+            in_trend = pd.DataFrame()
+            if not in_df.empty and '입고일자' in in_df.columns:
+                in_trend = in_df.groupby('입고일자')['数量'].sum().reset_index().rename(columns={'입고일자': '일자', '数量': '입고수량'})
+            
+            out_trend = pd.DataFrame()
+            if not hist_df.empty and '접수일자' in hist_df.columns:
+                out_trend = hist_df.groupby('접수일자').size().reset_index(name='출고주문건수').rename(columns={'접수일자': '일자'})
+            
+            if not in_trend.empty and not out_trend.empty:
+                trend_df = pd.merge(in_trend, out_trend, on='일자', how='outer').fillna(0).sort_values('일자')
+            elif not in_trend.empty:
+                trend_df = in_trend.copy()
+                trend_df['출고주문건수'] = 0
+            elif not out_trend.empty:
+                trend_df = out_trend.copy()
+                trend_df['입고수량'] = 0
+            else:
+                trend_df = pd.DataFrame(columns=['일자', '입고수량', '출고주문건수'])
+                
+            if not trend_df.empty:
+                import plotly.express as px
+                fig_trend = px.line(trend_df, x='일자', y=['입고수량', '출고주문건수'], markers=True, title="일자별 물동량 추이")
+                st.plotly_chart(fig_trend, use_container_width=True)
+            else:
+                st.info("데이터가 부족하여 트렌드를 표시할 수 없습니다.")
+                
+        with col2:
+            st.markdown("### 🚚 택배사별 출고 점유율")
+            if not hist_df.empty and '快递公司' in hist_df.columns:
+                courier_summary = hist_df.groupby('快递公司').size().reset_index(name='건수')
+                import plotly.express as px
+                fig_courier = px.pie(courier_summary, names='快递公司', values='건수', hole=0.3, title="택배사 배분 현황 (주문건 기준)")
+                st.plotly_chart(fig_courier, use_container_width=True)
+            else:
+                st.info("택배사 데이터가 없습니다.")
+
+        st.divider()
+        
+        col3, col4 = st.columns(2)
+        with col3:
+            st.markdown("### 🏆 Top 5 고객사 (주문건수 기준)")
+            if not hist_df.empty and '店铺' in hist_df.columns:
+                top_shops = hist_df.groupby('店铺').size().reset_index(name='건수').sort_values('건수', ascending=False).head(5)
+                import plotly.express as px
+                fig_top_shops = px.bar(top_shops, x='건수', y='店铺', orientation='h', title="상점(고객사)별 상위 물동량")
+                fig_top_shops.update_layout(yaxis={'categoryorder':'total ascending'})
+                st.plotly_chart(fig_top_shops, use_container_width=True)
+            else:
+                st.info("고객사(상점) 데이터가 없습니다.")
+                
+        with col4:
+            st.markdown("### 🚨 출고 예외 상태 현황 (지연/취소)")
+            if not hist_df.empty and '发货状态' in hist_df.columns:
+                status_summary = hist_df.groupby('发货状态').size().reset_index(name='건수')
+                import plotly.express as px
+                fig_status = px.pie(status_summary, names='发货状态', values='건수', title="출고 진행 상태 분류")
+                st.plotly_chart(fig_status, use_container_width=True)
+            else:
+                st.info("발송 상태 데이터가 없습니다.")
+
+        st.stop()
     
     if dashboard_type == '📥 입고 대시보드 (Inbound)':
         st.title("📥 입고(Inbound) 운영 리포트")
@@ -552,10 +637,6 @@ if not hist_df.empty or not in_df.empty:
                 
             else:
                 st.write("👆 **위 드롭다운 메뉴에서 상점을 선택하시면 세부 데이터(브랜드, 상품 등)가 나타납니다.**")
-
-    else:
-        st.title("👑 3PL 종합 운영 리포트 (Internal View)")
-        st.info("개편 중: 고객사 배포용 뷰를 우선 확인해 주세요.")
 
 else:
     st.warning("데이터 폴더에 파일이 없습니다. 안내에 따라 엑셀 파일을 넣어주세요.")
