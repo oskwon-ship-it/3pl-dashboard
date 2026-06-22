@@ -116,10 +116,9 @@ def load_data():
     in_df = pd.concat(in_list, ignore_index=True) if in_list else pd.DataFrame()
     
     if not in_df.empty:
-        # 중복 데이터 제거 (여러 월별 파일에 걸쳐 동일한 데이터가 겹쳐서 다운로드된 경우)
-        if '入库单号' in in_df.columns and '货品编号' in in_df.columns:
-            in_df = in_df.drop_duplicates(subset=['入库单号', '货品编号'], keep='first')
-            
+        # 중복 데이터 제거 (완전히 동일한 행만 제거하여 부분 입고 누락 방지)
+        in_df = in_df.drop_duplicates(keep='first')
+        
         if '审核时间' in in_df.columns:
             in_df['입고시간'] = pd.to_datetime(in_df['审核时间'], errors='coerce')
             in_df['입고일자'] = in_df['입고시간'].dt.date
