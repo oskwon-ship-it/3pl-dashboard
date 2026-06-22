@@ -28,6 +28,8 @@ def load_data(data_hash):
     detailed_files = glob.glob("data_detailed/*.xlsx") + glob.glob("data_detailed/*.xls")
     history_files = glob.glob("data_history/*.xlsx") + glob.glob("data_history/*.xls")
     inbound_files = glob.glob("data_inbound/*.xlsx") + glob.glob("data_inbound/*.xls")
+    cj_files = glob.glob("data_outbound_cj/*.xlsx") + glob.glob("data_outbound_cj/*.xls")
+    quick_files = glob.glob("data_outbound_quick/*.xlsx") + glob.glob("data_outbound_quick/*.xls")
     
     # 필수 컬럼만 지정하여 메모리 사용량 80% 이상 절약 (OOM 에러 방지)
     use_cols = [
@@ -147,9 +149,33 @@ def load_data(data_hash):
             if col in in_df.columns:
                 in_df[col] = pd.to_numeric(in_df[col], errors='coerce').fillna(0)
                 
-    return hist_df, detail_df, in_df
+    cj_list = []
+    for file in cj_files:
+        if "~$" in file: continue
+        try:
+            temp_df = pd.read_excel(file, engine='openpyxl' if file.endswith('.xlsx') else None)
+            cj_list.append(temp_df)
+        except: pass
+        
+    cj_df = pd.concat(cj_list, ignore_index=True) if cj_list else pd.DataFrame()
+    if not cj_df.empty and '집화일자' in cj_df.columns:
+        cj_df['집화일자'] = pd.to_datetime(cj_df['집화일자'], errors='coerce').dt.date
+        
+    qk_list = []
+    for file in quick_files:
+        if "~$" in file: continue
+        try:
+            temp_df = pd.read_excel(file, engine='openpyxl' if file.endswith('.xlsx') else None)
+            qk_list.append(temp_df)
+        except: pass
+        
+    qk_df = pd.concat(qk_list, ignore_index=True) if qk_list else pd.DataFrame()
+    if not qk_df.empty and '오더일자' in qk_df.columns:
+        qk_df['오더일자'] = pd.to_datetime(qk_df['오더일자'], errors='coerce').dt.date
 
-hist_df, detail_df, in_df = load_data(get_data_hash())
+    return hist_df, detail_df, in_df, cj_df, qk_df
+
+hist_df, detail_df, in_df, cj_df, qk_df = load_data(get_data_hash())
 
 if not hist_df.empty or not in_df.empty:
     with st.expander("⚙️ 3PL 대시보드 메뉴 및 설정 (여기를 눌러 필터를 변경하세요)", expanded=True):
@@ -192,6 +218,9 @@ if not hist_df.empty or not in_df.empty:
         curr_in_df = in_df[(in_df['입고일자'] >= start_date) & (in_df['입고일자'] <= end_date)] if not in_df.empty and '입고일자' in in_df.columns else pd.DataFrame()
         curr_hist_df = hist_df[(hist_df['접수일자'] >= start_date) & (hist_df['접수일자'] <= end_date)] if not hist_df.empty and '접수일자' in hist_df.columns else pd.DataFrame()
         curr_detail_df = detail_df[(detail_df['접수일자'] >= start_date) & (detail_df['접수일자'] <= end_date)] if not detail_df.empty and '접수일자' in detail_df.columns else pd.DataFrame()
+        
+        curr_cj_df = cj_df[(cj_df['집화일자'] >= start_date) & (cj_df['집화일자'] <= end_date)] if not cj_df.empty and '집화일자' in cj_df.columns else pd.DataFrame()
+        curr_qk_df = qk_df[(qk_df['오더일자'] >= start_date) & (qk_df['오더일자'] <= end_date)] if not qk_df.empty and '오더일자' in qk_df.columns else pd.DataFrame()
 
         # 전 기간(비교용) 필터링 (전월 동일 날짜 기준)
         prev_start_date = (pd.to_datetime(start_date) - pd.DateOffset(months=1)).date()
@@ -253,14 +282,22 @@ if not hist_df.empty or not in_df.empty:
                 st.info("데이터가 부족하여 트렌드를 표시할 수 없습니다.")
                 
         with col2:
-            st.markdown("### 🚚 택배사별 출고 점유율")
-            if not curr_hist_df.empty and '快递公司' in curr_hist_df.columns:
-                courier_summary = curr_hist_df.groupby('快递公司').size().reset_index(name='건수')
+            st.markdown("### 🚚 CJ vs 퀵 출고 비중 (건수)")
+            cj_cnt = len(curr_cj_df)
+            qk_cnt = len(curr_qk_df)
+            
+            if cj_cnt > 0 or qk_cnt > 0:
+                dist_df = pd.DataFrame({
+                    '출고방식': ['CJ 택배', '퀵 출고'],
+                    '건수': [cj_cnt, qk_cnt]
+                })
+                # 건수가 0인 항목은 파이차트에서 제외
+                dist_df = dist_df[dist_df['건수'] > 0]
                 import plotly.express as px
-                fig_courier = px.pie(courier_summary, names='快递公司', values='건수', hole=0.3, title="택배사 배분 현황 (주문건 기준)")
+                fig_courier = px.pie(dist_df, names='출고방식', values='건수', hole=0.3, title="CJ vs 퀵 출고 비중 (건수)", color='출고방식', color_discrete_map={'CJ 택배':'#1f77b4', '퀵 출고':'#ff7f0e'})
                 st.plotly_chart(fig_courier, use_container_width=True)
             else:
-                st.info("택배사 데이터가 없습니다.")
+                st.info("해당 기간의 출고 데이터가 없습니다.")
 
         st.divider()
         
