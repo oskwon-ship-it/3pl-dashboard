@@ -43,7 +43,8 @@ def load_data(data_hash):
     for file in history_files:
         if "~$" in file: continue
         try:
-            temp_df = pd.read_excel(file, usecols=col_filter)
+            engine = 'openpyxl' if file.endswith('.xlsx') else None
+            temp_df = pd.read_excel(file, usecols=col_filter, engine=engine)
             history_list.append(temp_df)
         except Exception as e:
             st.warning(f"출고내역 '{file}' 오류: {e}")
@@ -55,7 +56,8 @@ def load_data(data_hash):
     for file in detailed_files:
         if "~$" in file: continue
         try:
-            temp_df = pd.read_excel(file, usecols=col_filter)
+            engine = 'openpyxl' if file.endswith('.xlsx') else None
+            temp_df = pd.read_excel(file, usecols=col_filter, engine=engine)
             df_list.append(temp_df)
         except Exception as e:
             st.warning(f"상세 파일 '{file}' 오류: {e}")
@@ -119,7 +121,8 @@ def load_data(data_hash):
     for file in inbound_files:
         if "~$" in file: continue
         try:
-            temp_df = pd.read_excel(file)
+            engine = 'openpyxl' if file.endswith('.xlsx') else None
+            temp_df = pd.read_excel(file, engine=engine)
             temp_df = temp_df[[c for c in col_filter if c in temp_df.columns]]
             
             # 파일명에서 몇 월 데이터인지 추출 (예: '1월' -> 1)
