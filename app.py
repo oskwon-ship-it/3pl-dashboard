@@ -101,13 +101,20 @@ def get_data_hash():
     files = glob.glob('data_*/*.xlsx') + glob.glob('data_*/*.xls') + glob.glob('data_*/*.csv')
     return sum(os.path.getmtime(f) for f in files)
 
-@st.cache_data(ttl=3600)  # 1시간 단위 캐시 갱신 추가
+@st.cache_data(ttl=3600)
 def load_data(data_hash):
+    def clean_csv_junk(df):
+        for col in df.columns:
+            if df[col].dtype == object:
+                df[col] = df[col].astype(str).str.replace(r'^="', '', regex=True).str.replace(r'"$', '', regex=True).str.replace(r'^=', '', regex=True).str.replace(r'^"', '', regex=True)
+        return df
+
     detailed_files = glob.glob("data_detailed/*.csv") + glob.glob("data_detailed/*.xlsx") + glob.glob("data_detailed/*.xls")
     history_files = glob.glob("data_history/*.csv") + glob.glob("data_history/*.xlsx") + glob.glob("data_history/*.xls")
     inbound_files = glob.glob("data_inbound/*.csv") + glob.glob("data_inbound/*.xlsx") + glob.glob("data_inbound/*.xls")
     cj_files = glob.glob("data_outbound_cj/*.csv") + glob.glob("data_outbound_cj/*.xlsx") + glob.glob("data_outbound_cj/*.xls")
     quick_files = glob.glob("data_outbound_quick/*.csv") + glob.glob("data_outbound_quick/*.xlsx") + glob.glob("data_outbound_quick/*.xls")
+    inv_files = glob.glob("data_inventory/*.csv") + glob.glob("data_inventory/*.xlsx") + glob.glob("data_inventory/*.xls")
     
     # 필수 컬럼만 지정하여 메모리 사용량 80% 이상 절약 (OOM 에러 방지)
     use_cols = [
@@ -309,9 +316,28 @@ def load_data(data_hash):
     if not misship_df.empty and '접수일' in misship_df.columns:
         misship_df['접수일'] = pd.to_datetime(misship_df['접수일'], errors='coerce').dt.date
 
-    return hist_df, detail_df, in_df, cj_df, qk_df, misship_df
+    # 6. 재고 현황(Inventory) 로드
+    inv_list = []
+    for file in inv_files:
+        if "~$" in file: continue
+        try:
+            if file.endswith('.csv'):
+                temp_df = pd.read_csv(file, on_bad_lines='skip', low_memory=False)
+            else:
+                temp_df = pd.read_excel(file, engine='openpyxl' if file.endswith('.xlsx') else None)
+            temp_df = clean_csv_junk(temp_df)
+            inv_list.append(temp_df)
+        except: pass
+        
+    inv_df = pd.concat(inv_list, ignore_index=True) if inv_list else pd.DataFrame()
+    if not inv_df.empty:
+        for col in ['库存量', '占用量', '可发库存']:
+            if col in inv_df.columns:
+                inv_df[col] = pd.to_numeric(inv_df[col], errors='coerce').fillna(0)
 
-hist_df, detail_df, in_df, cj_df, qk_df, misship_df = load_data(get_data_hash())
+    return hist_df, detail_df, in_df, cj_df, qk_df, misship_df, inv_df
+
+hist_df, detail_df, in_df, cj_df, qk_df, misship_df, inv_df = load_data(get_data_hash())
 
 if not hist_df.empty or not in_df.empty:
     with st.expander("⚙️ 3PL 대시보드 메뉴 및 설정 (여기를 눌러 필터를 변경하세요)", expanded=True):
@@ -530,9 +556,10 @@ if not hist_df.empty or not in_df.empty:
         else:
             in_m_trend = pd.DataFrame(columns=['월', '입고수량'])
             
-        if not out_monthly.empty and '접수일자' in out_monthly.columns and '货品总数量' in out_monthly.columns:
-            out_monthly['월'] = pd.to_datetime(out_monthly['접수일자']).dt.to_period('M').astype(str)
-            out_m_trend = out_monthly.groupby('월')['货品总数量'].sum().reset_index().rename(columns={'货品总数量': '출고수량'})
+        if not out_monthly.empty and '접수일자' in out_monthly.columns and '货品数量' in out_monthly.columns:
+            valid_out_monthly = out_monthly[~out_monthly['出库单号'].isin(canceled_orders)] if '出库单号' in out_monthly.columns else out_monthly
+            valid_out_monthly['월'] = pd.to_datetime(valid_out_monthly['접수일자']).dt.to_period('M').astype(str)
+            out_m_trend = valid_out_monthly.groupby('월')['货品数量'].sum().reset_index().rename(columns={'货品数量': '출고수량'})
         else:
             out_m_trend = pd.DataFrame(columns=['월', '출고수량'])
             
@@ -560,6 +587,53 @@ if not hist_df.empty or not in_df.empty:
             st.plotly_chart(fig_mom, use_container_width=True)
         else:
             st.info("데이터가 부족하여 월별 트렌드를 표시할 수 없습니다.")
+
+        st.divider()
+        st.markdown("### 📦 창고 로케이션 및 재고 현황")
+        if not inv_df.empty:
+            # 1. 복도(Aisle) 열 생성: 로케이션(货位)의 첫 2글자 (예: B1, A2 등)
+            if '货位' in inv_df.columns:
+                inv_df['복도(Aisle)'] = inv_df['货位'].astype(str).str[:2]
+            
+            c1, c2 = st.columns(2)
+            with c1:
+                st.markdown("#### 🔹 구역별 재고 점유율")
+                if '货区名称' in inv_df.columns and '库存量' in inv_df.columns:
+                    zone_dist = inv_df.groupby('货区名称')['库存量'].sum().reset_index()
+                    import plotly.express as px
+                    fig_zone = px.pie(zone_dist, names='货区名称', values='库存量', hole=0.4)
+                    fig_zone.update_traces(textposition='inside', textinfo='percent+label')
+                    fig_zone.update_layout(margin=dict(t=30, b=0, l=0, r=0), showlegend=False)
+                    st.plotly_chart(fig_zone, use_container_width=True)
+                
+            with c2:
+                st.markdown("#### 🔹 복도(Aisle)별 보관량 현황")
+                if '복도(Aisle)' in inv_df.columns and '库存量' in inv_df.columns:
+                    aisle_dist = inv_df.groupby('복도(Aisle)')['库存量'].sum().reset_index().sort_values('库存量', ascending=False).head(10)
+                    fig_aisle = px.bar(aisle_dist, x='복도(Aisle)', y='库存量', text='库存量', color='库存量', color_continuous_scale='Blues')
+                    fig_aisle.update_layout(margin=dict(t=30, b=0, l=0, r=0), showlegend=False)
+                    st.plotly_chart(fig_aisle, use_container_width=True)
+            
+            st.markdown("#### 🔹 상위 적재 상품 Top 5 (선택 구역)")
+            if '货区名称' in inv_df.columns:
+                selected_zone = st.selectbox("조회할 구역(Zone)을 선택하세요:", options=inv_df['货区名称'].dropna().unique())
+                zone_df = inv_df[inv_df['货区名称'] == selected_zone]
+                if '货品简称' in zone_df.columns and '库存量' in zone_df.columns:
+                    top_items = zone_df.groupby('货品简称')['库存量'].sum().reset_index().sort_values('库存量', ascending=False).head(5)
+                    fig_top = px.bar(top_items, x='库存量', y='货品简称', orientation='h', color='库存量', color_continuous_scale='Teal')
+                    fig_top.update_layout(yaxis={'categoryorder':'total ascending'}, margin=dict(t=10, b=0, l=0, r=0))
+                    st.plotly_chart(fig_top, use_container_width=True)
+            
+            st.markdown("#### 🔍 로케이션 상세 검색 테이블")
+            show_cols = []
+            for c in ['货位', '복도(Aisle)', '货区名称', '货品简称', '品牌', '库存量', '可发库存', '货位修改时间']:
+                if c in inv_df.columns:
+                    show_cols.append(c)
+            if show_cols:
+                st.dataframe(inv_df[show_cols].sort_values('库存量', ascending=False), use_container_width=True, hide_index=True)
+                
+        else:
+            st.info("data_inventory 폴더에 재고 현황 데이터 파일이 없습니다.")
 
         st.stop()
     
