@@ -374,17 +374,17 @@ if not hist_df.empty or not in_df.empty:
                 # 총 오출고 건수 계산 (각 행을 1건으로)
                 total_misship = len(curr_misship_df)
                 
-                if '비고' in curr_misship_df.columns:
+                if '네트워크' in curr_misship_df.columns:
                     # 빈 값을 '기타/미분류'로 변경
                     ms_summary = curr_misship_df.copy()
-                    ms_summary['비고'] = ms_summary['비고'].fillna('기타/미분류')
-                    status_summary = ms_summary.groupby('비고').size().reset_index(name='건수')
+                    ms_summary['네트워크'] = ms_summary['네트워크'].fillna('기타/미분류')
+                    status_summary = ms_summary.groupby('네트워크').size().reset_index(name='건수')
                     
                     import plotly.express as px
-                    fig_status = px.pie(status_summary, names='비고', values='건수', hole=0.4)
+                    fig_status = px.pie(status_summary, names='네트워크', values='건수', hole=0.4)
                     fig_status.update_traces(textposition='inside', textinfo='percent+label')
                     fig_status.update_layout(
-                        title=f"오출고 사유별 비율 (총 {total_misship}건)",
+                        title=f"오출고 네트워크별 비율 (총 {total_misship}건)",
                         showlegend=False,
                         margin=dict(t=40, b=0, l=0, r=0)
                     )
