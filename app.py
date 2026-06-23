@@ -739,9 +739,8 @@ if not hist_df.empty or not in_df.empty:
                 canceled_count = int(cancel_mask.sum())
                 
                 pending_mask = pd.Series(False, index=shop_hist.index)
-                if '发货时间' in shop_hist.columns:
-                    valid_time_series = pd.to_datetime(shop_hist['发货时间'], errors='coerce')
-                    pending_mask = valid_time_series.isna() & ~cancel_mask
+                if '发货시간' in shop_hist.columns:
+                    pending_mask = shop_hist['发货시간'].isna() & ~cancel_mask
                     
                 pending_count = int(pending_mask.sum())
                 
