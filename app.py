@@ -708,7 +708,7 @@ if not hist_df.empty or not in_df.empty:
                 st.markdown("## 1️⃣ 상점(店铺) 물동량 요약")
                 shop_summary = hist_df.groupby('店铺').size().reset_index(name='주문건수')
                 fig_shop_pie = px.pie(shop_summary, names='店铺', values='주문건수', hole=0.3, title="전체 상점별 물동량 점유율 (접수 기준)")
-                fig_shop_pie.update_layout(margin=dict(l=0, r=0, t=30, b=0))
+                fig_shop_pie.update_layout(margin=dict(l=20, r=20, t=80, b=20), height=550)
                 st.plotly_chart(fig_shop_pie, use_container_width=True)
             
             if selected_shop != "상점을 선택하세요 (전체 데이터 유지)":
