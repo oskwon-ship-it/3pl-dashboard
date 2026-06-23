@@ -367,11 +367,11 @@ if not hist_df.empty or not in_df.empty:
         
         col3, col4 = st.columns(2)
         with col3:
-            st.markdown("### 🏆 Top 5 고객사 (주문건수 기준)")
+            st.markdown("### 🏆 전체 고객사 출고 현황 (주문건수 기준)")
             if not curr_hist_df.empty and '店铺' in curr_hist_df.columns:
-                top_shops = curr_hist_df.groupby('店铺').size().reset_index(name='건수').sort_values('건수', ascending=False).head(5)
+                top_shops = curr_hist_df.groupby('店铺').size().reset_index(name='건수').sort_values('건수', ascending=False)
                 import plotly.express as px
-                fig_top_shops = px.bar(top_shops, x='건수', y='店铺', orientation='h', title="상점(고객사)별 상위 물동량")
+                fig_top_shops = px.bar(top_shops, x='건수', y='店铺', orientation='h', title="고객사(상점)별 물동량")
                 fig_top_shops.update_layout(yaxis={'categoryorder':'total ascending'})
                 st.plotly_chart(fig_top_shops, use_container_width=True)
             else:
