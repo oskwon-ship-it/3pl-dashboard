@@ -101,7 +101,7 @@ def get_data_hash():
     files = glob.glob('data_*/*.xlsx') + glob.glob('data_*/*.xls') + glob.glob('data_*/*.csv')
     return sum(os.path.getmtime(f) for f in files)
 
-@st.cache_data(ttl=3600)
+@st.cache_data(max_entries=1, ttl=600)
 def load_data(data_hash):
     def clean_csv_junk(df):
         for col in df.columns:
@@ -317,14 +317,19 @@ def load_data(data_hash):
         misship_df['접수일'] = pd.to_datetime(misship_df['접수일'], errors='coerce').dt.date
 
     # 6. 재고 현황(Inventory) 로드
+    inv_use_cols = ['货位', '货区名称', '货品简称', '品牌', '库存', '库存量', '占用量', '可发库存', '自定义属性3', '自定义属性4', '毛重（kg）', '有效期', '距离到期天数', '距离临期天数', '货位修改时间']
+    def inv_col_filter(c):
+        return c in inv_use_cols
+
     inv_list = []
     for file in inv_files:
         if "~$" in file: continue
         try:
             if file.endswith('.csv'):
                 temp_df = pd.read_csv(file, on_bad_lines='skip', low_memory=False)
+                temp_df = temp_df[[c for c in inv_use_cols if c in temp_df.columns]]
             else:
-                temp_df = pd.read_excel(file, engine='openpyxl' if file.endswith('.xlsx') else None)
+                temp_df = pd.read_excel(file, usecols=inv_col_filter, engine='openpyxl' if file.endswith('.xlsx') else None)
             temp_df = clean_csv_junk(temp_df)
             inv_list.append(temp_df)
         except: pass
