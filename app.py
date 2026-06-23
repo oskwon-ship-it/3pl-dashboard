@@ -6,6 +6,75 @@ import os
 
 st.set_page_config(page_title="3PL 맞춤형 대시보드", page_icon="📦", layout="wide")
 
+custom_css = '''
+<style>
+/* 전역 폰트 및 스타일 */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+html, body, [class*="css"] {
+    font-family: 'Inter', sans-serif !important;
+}
+
+/* 커스텀 카드 스타일 */
+.custom-card {
+    background-color: #161b22;
+    border-radius: 12px;
+    padding: 20px;
+    margin: 10px 0;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    border: 1px solid #30363d;
+    text-align: center;
+    transition: transform 0.2s ease-in-out;
+}
+.custom-card:hover {
+    transform: translateY(-5px);
+    border-color: #00E5FF;
+    box-shadow: 0 6px 12px rgba(0, 229, 255, 0.1);
+}
+
+/* 타이틀 */
+.card-title {
+    color: #8b949e;
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 10px;
+}
+
+/* 주요 수치 */
+.card-value {
+    color: #00E5FF;
+    font-size: 34px;
+    font-weight: 800;
+    margin-bottom: 12px;
+    text-shadow: 0 0 10px rgba(0, 229, 255, 0.3);
+}
+
+/* 증감 뱃지 */
+.card-badge {
+    display: inline-block;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    background-color: rgba(46, 160, 67, 0.15);
+    color: #3fb950;
+    border: 1px solid rgba(46, 160, 67, 0.4);
+}
+.card-badge.negative {
+    background-color: rgba(248, 81, 73, 0.15);
+    color: #f85149;
+    border: 1px solid rgba(248, 81, 73, 0.4);
+}
+.card-badge.neutral {
+    background-color: rgba(139, 148, 158, 0.15);
+    color: #8b949e;
+    border: 1px solid rgba(139, 148, 158, 0.4);
+}
+</style>
+'''
+st.markdown(custom_css, unsafe_allow_html=True)
+
+
+
 def apply_korean_date_format(fig):
     fig.update_xaxes(
         tickformatstops=[
@@ -316,11 +385,33 @@ if not hist_df.empty or not in_df.empty:
         prev_misship_rate = (prev_misship / prev_out_orders * 100) if prev_out_orders > 0 else 0.0
 
         kpi1, kpi2, kpi3, kpi4, kpi5 = st.columns(5)
-        kpi1.metric("📦 총 입고 수량", f"{total_in_qty:,.0f} 개", f"{total_in_qty - prev_in_qty:,.0f} 개 (전월 동기간 대비)")
-        kpi2.metric("📦 총 입고 박스", f"{total_in_box:,.1f} Box", f"{total_in_box - prev_in_box:,.1f} Box (전월 동기간 대비)")
-        kpi3.metric("🚀 총 출고 주문건수", f"{total_out_orders:,.0f} 건", f"{total_out_orders - prev_out_orders:,.0f} 건 (전월 동기간 대비)")
-        kpi4.metric("🚀 총 출고 수량", f"{total_out_qty:,.0f} 개", f"{total_out_qty - prev_out_qty:,.0f} 개 (전월 동기간 대비)")
-        kpi5.metric("🚨 오출고율", f"{misship_rate:.2f}%", f"{misship_rate - prev_misship_rate:.2f}%p (전월 동기간 대비)", delta_color="inverse")
+        
+        def make_card(title, val_str, diff_val, unit, inverse=False):
+            if diff_val > 0:
+                bc = "negative" if inverse else ""
+                icon = "📈 +"
+            elif diff_val < 0:
+                bc = "" if inverse else "negative"
+                icon = "📉 "
+            else:
+                bc = "neutral"
+                icon = "➖ "
+            return f'''<div class="custom-card">
+                <div class="card-title">{title}</div>
+                <div class="card-value">{val_str}</div>
+                <div class="card-badge {bc}">{icon}{abs(diff_val):,.1f}{unit} (전월대비)</div>
+            </div>'''
+
+        with kpi1:
+            st.markdown(make_card("📦 총 입고 수량", f"{total_in_qty:,.0f} 개", total_in_qty - prev_in_qty, "개"), unsafe_allow_html=True)
+        with kpi2:
+            st.markdown(make_card("📦 총 입고 박스", f"{total_in_box:,.1f} Box", total_in_box - prev_in_box, "Box"), unsafe_allow_html=True)
+        with kpi3:
+            st.markdown(make_card("🚀 총 출고 주문건수", f"{total_out_orders:,.0f} 건", total_out_orders - prev_out_orders, "건"), unsafe_allow_html=True)
+        with kpi4:
+            st.markdown(make_card("🚀 총 출고 수량", f"{total_out_qty:,.0f} 개", total_out_qty - prev_out_qty, "개"), unsafe_allow_html=True)
+        with kpi5:
+            st.markdown(make_card("🚨 오출고율", f"{misship_rate:.2f}%", misship_rate - prev_misship_rate, "%p", inverse=True), unsafe_allow_html=True)
         
         st.divider()
         
