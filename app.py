@@ -284,6 +284,7 @@ if not hist_df.empty or not in_df.empty:
         prev_in_df = in_df[(in_df['입고일자'] >= prev_start_date) & (in_df['입고일자'] <= prev_end_date)] if not in_df.empty and '입고일자' in in_df.columns else pd.DataFrame()
         prev_hist_df = hist_df[(hist_df['접수일자'] >= prev_start_date) & (hist_df['접수일자'] <= prev_end_date)] if not hist_df.empty and '접수일자' in hist_df.columns else pd.DataFrame()
         prev_detail_df = detail_df[(detail_df['접수일자'] >= prev_start_date) & (detail_df['접수일자'] <= prev_end_date)] if not detail_df.empty and '접수일자' in detail_df.columns else pd.DataFrame()
+        prev_misship_df = misship_df[(misship_df['접수일'] >= prev_start_date) & (misship_df['접수일'] <= prev_end_date)] if not misship_df.empty and '접수일' in misship_df.columns else pd.DataFrame()
 
         st.markdown(f"### 📊 센터 핵심 KPI ({start_date.strftime('%y.%m.%d')} ~ {end_date.strftime('%y.%m.%d')})")
         
@@ -297,12 +298,20 @@ if not hist_df.empty or not in_df.empty:
         prev_in_box = prev_in_df['绩效箱数'].sum() if not prev_in_df.empty and '绩效箱数' in prev_in_df.columns else 0
         prev_out_orders = len(prev_hist_df) if not prev_hist_df.empty else 0
         prev_out_qty = prev_detail_df['货品总数量'].sum() if not prev_detail_df.empty and '货品总数量' in prev_detail_df.columns else 0
+        
+        # 오출고율 계산
+        total_misship = len(curr_misship_df) if not curr_misship_df.empty else 0
+        misship_rate = (total_misship / total_out_orders * 100) if total_out_orders > 0 else 0.0
+        
+        prev_misship = len(prev_misship_df) if not prev_misship_df.empty else 0
+        prev_misship_rate = (prev_misship / prev_out_orders * 100) if prev_out_orders > 0 else 0.0
 
-        kpi1, kpi2, kpi3, kpi4 = st.columns(4)
+        kpi1, kpi2, kpi3, kpi4, kpi5 = st.columns(5)
         kpi1.metric("📦 총 입고 수량", f"{total_in_qty:,.0f} 개", f"{total_in_qty - prev_in_qty:,.0f} 개 (전월 동기간 대비)")
         kpi2.metric("📦 총 입고 박스", f"{total_in_box:,.1f} Box", f"{total_in_box - prev_in_box:,.1f} Box (전월 동기간 대비)")
         kpi3.metric("🚀 총 출고 주문건수", f"{total_out_orders:,.0f} 건", f"{total_out_orders - prev_out_orders:,.0f} 건 (전월 동기간 대비)")
         kpi4.metric("🚀 총 출고 수량", f"{total_out_qty:,.0f} 개", f"{total_out_qty - prev_out_qty:,.0f} 개 (전월 동기간 대비)")
+        kpi5.metric("🚨 오출고율", f"{misship_rate:.2f}%", f"{misship_rate - prev_misship_rate:.2f}%p (전월 동기간 대비)", delta_color="inverse")
         
         st.divider()
         
