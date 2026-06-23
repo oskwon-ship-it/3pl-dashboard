@@ -678,6 +678,107 @@ if not hist_df.empty or not in_df.empty:
             if show_cols:
                 st.dataframe(inv_df[show_cols].sort_values('库存', ascending=False), use_container_width=True, hide_index=True)
                 
+            st.divider()
+            st.markdown("### 🗺️ 창고 로케이션 2D 시각화 도면 (Grid Map)")
+            
+            WAREHOUSE_LAYOUT = {
+                'A01': {'cols': 40, 'rows': 3},
+                'A02': {'cols': 36, 'rows': 3},
+                'A03': {'cols': 36, 'rows': 3},
+                'A04': {'cols': 36, 'rows': 3},
+                'A05': {'cols': 36, 'rows': 3},
+                'A06': {'cols': 28, 'rows': 4},
+                'B1': {'cols': 25, 'rows': 2},
+                'B2': {'cols': 25, 'rows': 3},
+                'H': {'cols': 4, 'rows': 4}
+            }
+            
+            selected_map_zone = st.selectbox("🗺️ 시각화할 도면(Aisle)을 선택하세요:", options=list(WAREHOUSE_LAYOUT.keys()))
+            
+            if selected_map_zone:
+                layout = WAREHOUSE_LAYOUT[selected_map_zone]
+                max_col = layout['cols']
+                max_row = layout['rows']
+                
+                # 2D 배열 초기화 (행: Layer, 열: Slot)
+                # 인덱스 0이 가장 아래(01단)부터 위로 올라가도록 구성 (또는 시각적으로 편하게)
+                # Plotly heatmap은 y축이 아래에서 위로 감
+                import numpy as np
+                z_data = np.zeros((max_row, max_col))
+                hover_text = [["빈자리" for _ in range(max_col)] for _ in range(max_row)]
+                
+                # 해당 Zone의 데이터 필터링 (예: A01-05-02)
+                zone_data = inv_df[inv_df['복도(Aisle)'] == selected_map_zone] if '복도(Aisle)' in inv_df.columns else pd.DataFrame()
+                
+                if not zone_data.empty and '货位' in zone_data.columns:
+                    for _, row in zone_data.iterrows():
+                        loc = str(row['货位'])
+                        parts = loc.split('-')
+                        if len(parts) == 3:
+                            try:
+                                # A01-40-03 -> slot=40, layer=3
+                                slot = int(parts[1])
+                                layer = int(parts[2])
+                                
+                                if 1 <= slot <= max_col and 1 <= layer <= max_row:
+                                    y_idx = layer - 1
+                                    x_idx = slot - 1
+                                    
+                                    # 해당 위치에 값이 있음을 표시 (노란색 1)
+                                    z_data[y_idx, x_idx] = 1
+                                    
+                                    prod_name = row.get('货品简称', '알 수 없음')
+                                    qty = row.get('库存', 0)
+                                    exp_days = row.get('距离到期天数', '정보없음')
+                                    hover_text[y_idx][x_idx] = f"로케이션: {loc}<br>상품명: {prod_name}<br>재고량: {qty}개<br>만료까지: {exp_days}일"
+                            except:
+                                pass
+                
+                import plotly.graph_objects as go
+                
+                fig_map = go.Figure(data=go.Heatmap(
+                    z=z_data,
+                    text=hover_text,
+                    hoverinfo="text",
+                    colorscale=[[0, '#333333'], [1, '#FFD700']], # 0: 다크그레이(빈자리), 1: 노란색(사용중)
+                    showscale=False,
+                    xgap=3,
+                    ygap=3
+                ))
+                
+                # 축 설정
+                fig_map.update_layout(
+                    title=f"📍 {selected_map_zone} 구역 도면 (노란색: 사용중 / 회색: 빈자리)",
+                    xaxis=dict(
+                        tickmode='array',
+                        tickvals=list(range(max_col)),
+                        ticktext=[f"{i:02d}" for i in range(1, max_col + 1)],
+                        title="열 (Slot)"
+                    ),
+                    yaxis=dict(
+                        tickmode='array',
+                        tickvals=list(range(max_row)),
+                        ticktext=[f"{i:02d}" for i in range(1, max_row + 1)],
+                        title="단 (Layer)",
+                        scaleanchor="x",
+                        scaleratio=1
+                    ),
+                    height=max_row * 40 + 200, # 행 수에 따라 높이 조절
+                    margin=dict(t=50, b=50, l=50, r=50)
+                )
+                
+                st.plotly_chart(fig_map, use_container_width=True)
+                
+                # 요약 지표
+                total_spots = max_row * max_col
+                used_spots = int(np.sum(z_data))
+                empty_spots = total_spots - used_spots
+                
+                sum_col1, sum_col2, sum_col3 = st.columns(3)
+                sum_col1.metric("전체 자리 수", f"{total_spots}칸")
+                sum_col2.metric("사용 중인 자리", f"{used_spots}칸")
+                sum_col3.metric("빈 자리 (여유 공간)", f"{empty_spots}칸")
+                
         else:
             st.info("data_inventory 폴더에 재고 현황 데이터 파일이 없습니다.")
 
