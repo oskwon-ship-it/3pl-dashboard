@@ -761,7 +761,8 @@ if not hist_df.empty or not in_df.empty:
                         ticktext=[f"{i:02d}" for i in range(1, max_row + 1)],
                         title="단 (Layer)",
                         scaleanchor="x",
-                        scaleratio=1
+                        scaleratio=1,
+                        autorange='reversed'
                     ),
                     height=max_row * 40 + 200, # 행 수에 따라 높이 조절
                     margin=dict(t=50, b=50, l=50, r=50)
