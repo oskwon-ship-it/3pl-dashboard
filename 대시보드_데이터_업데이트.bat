@@ -10,7 +10,7 @@ echo.
 cd /d "%~dp0"
 
 echo [1/3] 변경된 데이터를 확인하는 중...
-git add data_inbound/ data_history/ data_detailed/ data_outbound_cj/ data_outbound_quick/
+git add data_inbound/ data_history/ data_detailed/ data_outbound_cj/ data_outbound_quick/ data_misship/ data_inventory/
 
 echo [2/3] 변경 사항을 저장하는 중...
 git commit -m "Auto-update dashboard data" > nul 2>&1
