@@ -832,6 +832,7 @@ if not hist_df.empty or not in_df.empty:
                             clicked_region = region_event.selection.points[0].get('location') or region_event.selection.points[0].get('y')
                         
                         # 2순위: 기본 지역 (가장 주문이 많은 지역)
+                        top_regions = region_summary.sort_values(by='주문건수', ascending=False)
                         default_region = top_regions.iloc[0]['지역(省)'] if not top_regions.empty and top_regions.iloc[0]['지역(省)'] != '미상' else unique_regions[0]
                         
                         # 클릭된 지역이 있으면 그 지역을 현재 선택된 지역으로 지정
