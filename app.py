@@ -804,16 +804,18 @@ if not hist_df.empty or not in_df.empty:
                     
                     china_geojson = get_china_geojson()
                     
-                    fig_region = px.choropleth(
+                    fig_region = px.choropleth_mapbox(
                         region_summary,
                         geojson=china_geojson,
                         locations="지역(省)",
                         featureidkey="properties.name",
                         color="주문건수",
                         color_continuous_scale="Sunset",
-                        scope="asia"
+                        mapbox_style="carto-positron",
+                        zoom=3,
+                        center={"lat": 35.8617, "lon": 104.1954},
+                        opacity=0.6
                     )
-                    fig_region.update_geos(fitbounds="locations", visible=False)
                     fig_region.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
                     
                     # 클릭 이벤트를 받아서 연동 (Streamlit 1.35 이상)
