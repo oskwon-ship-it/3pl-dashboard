@@ -18,6 +18,15 @@ def apply_korean_date_format(fig):
     )
     return fig
 
+
+@st.cache_data
+def get_china_geojson():
+    import urllib.request
+    import json
+    url = "https://raw.githubusercontent.com/longwosion/geojson-map-china/master/china.json"
+    with urllib.request.urlopen(url) as response:
+        return json.loads(response.read().decode())
+
 def get_data_hash():
     import os, glob
     files = glob.glob('data_*/*.xlsx') + glob.glob('data_*/*.xls')
@@ -784,17 +793,29 @@ if not hist_df.empty or not in_df.empty:
                         st.dataframe(brand_item_summary.rename(columns={'상품표시명':'상품명', '货品总数量':'출고수량(개)'}), use_container_width=True, hide_index=True)
                         st.divider()
 
-                # 6. 지역별 배송 목적지 현황
+                # 6. 지역별 배송 목적지 현황 (중국 지도 히트맵)
                 if not valid_shop_detail.empty and '省市区' in valid_shop_detail.columns:
-                    st.markdown("## 6️⃣ 지역별 배송 현황 (Top 15)")
+                    st.markdown("## 6️⃣ 지역별 배송 현황 (지도)")
                     
                     # '广东省 深圳市 남산구' 형태에서 첫 번째 '广东省'만 추출
                     valid_shop_detail['지역(省)'] = valid_shop_detail['省市区'].apply(lambda x: str(x).split()[0] if pd.notna(x) and str(x).strip() != '' else '미상')
                     
                     region_summary = valid_shop_detail.drop_duplicates(subset=['出库单号']).groupby('지역(省)').size().reset_index(name='주문건수')
-                    top_regions = region_summary.nlargest(15, '주문건수')
                     
-                    fig_region = px.bar(top_regions, x='주문건수', y='지역(省)', orientation='h', color='주문건수', color_continuous_scale='Sunset')
+                    china_geojson = get_china_geojson()
+                    
+                    fig_region = px.choropleth(
+                        region_summary,
+                        geojson=china_geojson,
+                        locations="지역(省)",
+                        featureidkey="properties.name",
+                        color="주문건수",
+                        color_continuous_scale="Sunset",
+                        scope="asia"
+                    )
+                    fig_region.update_geos(fitbounds="locations", visible=False)
+                    fig_region.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
+                    
                     # 클릭 이벤트를 받아서 연동 (Streamlit 1.35 이상)
                     region_event = st.plotly_chart(fig_region, use_container_width=True, on_select="rerun")
                     st.divider()
@@ -806,7 +827,7 @@ if not hist_df.empty or not in_df.empty:
                         # 1순위: 사용자가 차트에서 클릭한 지역
                         clicked_region = None
                         if region_event and len(region_event.selection.points) > 0:
-                            clicked_region = region_event.selection.points[0]['y']
+                            clicked_region = region_event.selection.points[0].get('location') or region_event.selection.points[0].get('y')
                         
                         # 2순위: 기본 지역 (가장 주문이 많은 지역)
                         default_region = top_regions.iloc[0]['지역(省)'] if not top_regions.empty and top_regions.iloc[0]['지역(省)'] != '미상' else unique_regions[0]
