@@ -370,16 +370,26 @@ if not hist_df.empty or not in_df.empty:
 
         st.markdown(f"### 📊 센터 핵심 KPI ({start_date.strftime('%y.%m.%d')} ~ {end_date.strftime('%y.%m.%d')})")
         
+        # 취소 주문 마스크 계산 (마스터 데이터 기준)
+        cancel_mask = pd.Series(False, index=hist_df.index)
+        if '发货状态' in hist_df.columns:
+            cancel_mask = hist_df['发货状态'].isna() | (hist_df['发货状态'].astype(str).str.strip() == '')
+        canceled_orders = set(hist_df[cancel_mask]['出库单号']) if '出库单号' in hist_df.columns else set()
+        
+        # 취소 주문 제외된 상세 데이터 생성
+        valid_curr_detail = curr_detail_df[~curr_detail_df['出库单号'].isin(canceled_orders)] if not curr_detail_df.empty and '出库单号' in curr_detail_df.columns else curr_detail_df
+        valid_prev_detail = prev_detail_df[~prev_detail_df['出库单号'].isin(canceled_orders)] if not prev_detail_df.empty and '出库单号' in prev_detail_df.columns else prev_detail_df
+
         # Calculate KPIs
         total_in_qty = curr_in_df['数量'].sum() if not curr_in_df.empty and '数量' in curr_in_df.columns else 0
         total_in_box = curr_in_df['绩效箱数'].sum() if not curr_in_df.empty and '绩效箱数' in curr_in_df.columns else 0
         total_out_orders = len(curr_hist_df) if not curr_hist_df.empty else 0
-        total_out_qty = curr_detail_df['货品数量'].sum() if not curr_detail_df.empty and '货品数量' in curr_detail_df.columns else 0
+        total_out_qty = valid_curr_detail['货品数量'].sum() if not valid_curr_detail.empty and '货品数量' in valid_curr_detail.columns else 0
         
         prev_in_qty = prev_in_df['数量'].sum() if not prev_in_df.empty and '数量' in prev_in_df.columns else 0
         prev_in_box = prev_in_df['绩效箱数'].sum() if not prev_in_df.empty and '绩效箱数' in prev_in_df.columns else 0
         prev_out_orders = len(prev_hist_df) if not prev_hist_df.empty else 0
-        prev_out_qty = prev_detail_df['货品总数量'].sum() if not prev_detail_df.empty and '货品总数量' in prev_detail_df.columns else 0
+        prev_out_qty = valid_prev_detail['货品数量'].sum() if not valid_prev_detail.empty and '货品数量' in valid_prev_detail.columns else 0
         
         # 오출고율 계산
         total_misship = len(curr_misship_df) if not curr_misship_df.empty else 0
@@ -428,8 +438,8 @@ if not hist_df.empty or not in_df.empty:
                 in_trend = curr_in_df.groupby('입고일자')['数量'].sum().reset_index().rename(columns={'입고일자': '일자', '数量': '입고수량'})
             
             out_trend = pd.DataFrame()
-            if not curr_detail_df.empty and '접수일자' in curr_detail_df.columns and '货品总数量' in curr_detail_df.columns:
-                out_trend = curr_detail_df.groupby('접수일자')['货品总数量'].sum().reset_index().rename(columns={'접수일자': '일자', '货品总数量': '출고수량'})
+            if not valid_curr_detail.empty and '접수일자' in valid_curr_detail.columns and '货品数量' in valid_curr_detail.columns:
+                out_trend = valid_curr_detail.groupby('접수일자')['货品数量'].sum().reset_index().rename(columns={'접수일자': '일자', '货品数量': '출고수량'})
             
             if not in_trend.empty and not out_trend.empty:
                 trend_df = pd.merge(in_trend, out_trend, on='일자', how='outer').fillna(0).sort_values('일자')
