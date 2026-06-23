@@ -208,6 +208,8 @@ def load_data(data_hash):
             detail_df['发货일자'] = detail_df['发货시간'].dt.date
         if '货品总数量' in detail_df.columns:
             detail_df['货品总数量'] = pd.to_numeric(detail_df['货品总数量'], errors='coerce').fillna(0)
+        if '货品数量' in detail_df.columns:
+            detail_df['货品数量'] = pd.to_numeric(detail_df['货品数量'], errors='coerce').fillna(0)
             
     col_filter = ['入库单号', '仓库', '货主', '货品编号', '货品简称', '申请单号', '数量', '绩效箱数', '审核时间', '入库原因', '品牌']
     inbound_files = glob.glob(os.path.join("data_inbound", "*.csv")) + glob.glob(os.path.join("data_inbound", "*.xlsx"))
@@ -372,7 +374,7 @@ if not hist_df.empty or not in_df.empty:
         total_in_qty = curr_in_df['数量'].sum() if not curr_in_df.empty and '数量' in curr_in_df.columns else 0
         total_in_box = curr_in_df['绩效箱数'].sum() if not curr_in_df.empty and '绩效箱数' in curr_in_df.columns else 0
         total_out_orders = len(curr_hist_df) if not curr_hist_df.empty else 0
-        total_out_qty = curr_detail_df['货品总数量'].sum() if not curr_detail_df.empty and '货品总数量' in curr_detail_df.columns else 0
+        total_out_qty = curr_detail_df['货品数量'].sum() if not curr_detail_df.empty and '货品数量' in curr_detail_df.columns else 0
         
         prev_in_qty = prev_in_df['数量'].sum() if not prev_in_df.empty and '数量' in prev_in_df.columns else 0
         prev_in_box = prev_in_df['绩效箱数'].sum() if not prev_in_df.empty and '绩效箱数' in prev_in_df.columns else 0
