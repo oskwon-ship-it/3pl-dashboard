@@ -188,21 +188,23 @@ def load_data(data_hash):
             detail_df['店铺'] = detail_df['店铺'].apply(merge_shop)
 
     # 5. 날짜 전처리
+    def clean_date_str(s):
+        return s.astype(str).str.replace(r'^[="]+', '', regex=True).str.replace(r'["]+$', '', regex=True).replace('0000-00-00 00:00:00', pd.NaT).replace('0000-00-00', pd.NaT).replace('nan', pd.NaT)
+
     if not hist_df.empty:
         if '审核时间' in hist_df.columns:
-            hist_df['접수시간'] = pd.to_datetime(hist_df['审核时间'], errors='coerce')
+            hist_df['접수시간'] = pd.to_datetime(clean_date_str(hist_df['审核时间']), errors='coerce')
             hist_df['접수일자'] = hist_df['접수시간'].dt.date
         if '发货时间' in hist_df.columns:
-            temp_time = hist_df['发货时间'].astype(str).replace('0000-00-00 00:00:00', pd.NaT).replace('0000-00-00', pd.NaT)
-            hist_df['发货시간'] = pd.to_datetime(temp_time, errors='coerce')
+            hist_df['发货시간'] = pd.to_datetime(clean_date_str(hist_df['发货时间']), errors='coerce')
             hist_df['发货일자'] = hist_df['发货시간'].dt.date
             
     if not detail_df.empty:
         if '审核时间' in detail_df.columns:
-            detail_df['접수시간'] = pd.to_datetime(detail_df['审核时间'], errors='coerce')
+            detail_df['접수시간'] = pd.to_datetime(clean_date_str(detail_df['审核时间']), errors='coerce')
             detail_df['접수일자'] = detail_df['접수시간'].dt.date
         if '发货时间' in detail_df.columns:
-            detail_df['发货시간'] = pd.to_datetime(detail_df['发货时间'], errors='coerce')
+            detail_df['发货시간'] = pd.to_datetime(clean_date_str(detail_df['发货时间']), errors='coerce')
             detail_df['发货일자'] = detail_df['发货시간'].dt.date
         if '货品总数量' in detail_df.columns:
             detail_df['货品总数量'] = pd.to_numeric(detail_df['货品总数量'], errors='coerce').fillna(0)
