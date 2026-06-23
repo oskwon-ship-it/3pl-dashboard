@@ -98,14 +98,14 @@ def get_china_geojson():
 
 def get_data_hash():
     import os, glob
-    files = glob.glob('data_*/*.xlsx') + glob.glob('data_*/*.xls')
+    files = glob.glob('data_*/*.xlsx') + glob.glob('data_*/*.xls') + glob.glob('data_*/*.csv')
     return sum(os.path.getmtime(f) for f in files)
 
 @st.cache_data(ttl=3600)  # 1시간 단위 캐시 갱신 추가
 def load_data(data_hash):
     detailed_files = glob.glob("data_detailed/*.csv") + glob.glob("data_detailed/*.xlsx") + glob.glob("data_detailed/*.xls")
     history_files = glob.glob("data_history/*.csv") + glob.glob("data_history/*.xlsx") + glob.glob("data_history/*.xls")
-    inbound_files = glob.glob("data_inbound/*.xlsx") + glob.glob("data_inbound/*.xls")
+    inbound_files = glob.glob("data_inbound/*.csv") + glob.glob("data_inbound/*.xlsx") + glob.glob("data_inbound/*.xls")
     cj_files = glob.glob("data_outbound_cj/*.csv") + glob.glob("data_outbound_cj/*.xlsx") + glob.glob("data_outbound_cj/*.xls")
     quick_files = glob.glob("data_outbound_quick/*.csv") + glob.glob("data_outbound_quick/*.xlsx") + glob.glob("data_outbound_quick/*.xls")
     
