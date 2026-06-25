@@ -721,29 +721,30 @@ if not hist_df.empty or not in_df.empty:
         st.warning("data_history 폴더에 출고 데이터 파일이 없습니다. 엑셀 파일을 넣어주세요.")
         st.stop()
     
-    with st.expander("📅 출고 데이터 필터", expanded=True):
-        if '접수일자' in hist_df.columns:
-            min_date = hist_df['접수일자'].dropna().min()
-            max_date = hist_df['접수일자'].dropna().max()
-            
-            date_range = st.date_input(
-                "조회할 기간을 선택하세요", 
-                value=(min_date, max_date),
-                format="YYYY-MM-DD"
-            )
-            
-            if isinstance(date_range, tuple) and len(date_range) == 2:
-                start_date, end_date = date_range
-                hist_df = hist_df[(hist_df['접수일자'] >= start_date) & (hist_df['접수일자'] <= end_date)]
-                if not detail_df.empty and '접수일자' in detail_df.columns:
-                    detail_df = detail_df[(detail_df['접수일자'] >= start_date) & (detail_df['접수일자'] <= end_date)]
-                selected_period_text = f"{start_date.strftime('%Y-%m-%d')} ~ {end_date.strftime('%Y-%m-%d')}"
-            else:
-                selected_period_text = "전체 기간"
+    if view_mode == '💼 고객사 배포용 (Client View)':
+        with st.expander("📅 출고 데이터 필터", expanded=True):
+            if '접수일자' in hist_df.columns:
+                min_date = hist_df['접수일자'].dropna().min()
+                max_date = hist_df['접수일자'].dropna().max()
                 
-        if view_mode == '💼 고객사 배포용 (Client View)' and '店铺' in hist_df.columns:
-            shop_list = ["상점을 선택하세요 (전체 데이터 유지)"] + sorted(hist_df['店铺'].dropna().unique().tolist())
-            selected_shop = st.selectbox("📌 상세 분석을 진행할 상점(店铺)을 선택해 주세요:", shop_list)
+                date_range = st.date_input(
+                    "조회할 기간을 선택하세요", 
+                    value=(min_date, max_date),
+                    format="YYYY-MM-DD"
+                )
+                
+                if isinstance(date_range, tuple) and len(date_range) == 2:
+                    start_date, end_date = date_range
+                    hist_df = hist_df[(hist_df['접수일자'] >= start_date) & (hist_df['접수일자'] <= end_date)]
+                    if not detail_df.empty and '접수일자' in detail_df.columns:
+                        detail_df = detail_df[(detail_df['접수일자'] >= start_date) & (detail_df['접수일자'] <= end_date)]
+                    selected_period_text = f"{start_date.strftime('%Y-%m-%d')} ~ {end_date.strftime('%Y-%m-%d')}"
+                else:
+                    selected_period_text = "전체 기간"
+                    
+            if '店铺' in hist_df.columns:
+                shop_list = ["상점을 선택하세요 (전체 데이터 유지)"] + sorted(hist_df['店铺'].dropna().unique().tolist())
+                selected_shop = st.selectbox("📌 상세 분석을 진행할 상점(店铺)을 선택해 주세요:", shop_list)
     
     if view_mode == '💼 고객사 배포용 (Client View)':
         st.title("💼 고객사 맞춤형 출고 리포트 (드릴다운 뷰)")
