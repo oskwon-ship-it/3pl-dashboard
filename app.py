@@ -199,18 +199,18 @@ def load_data(data_hash):
 
     if not hist_df.empty:
         if '审核时间' in hist_df.columns:
-            hist_df['접수시간'] = pd.to_datetime(clean_date_str(hist_df['审核时间']), errors='coerce')
+            hist_df['접수시간'] = pd.to_datetime(clean_date_str(hist_df['审核时间']), errors='coerce', format='mixed')
             hist_df['접수일자'] = pd.to_datetime(hist_df['审核时间'], errors='coerce', format='mixed').dt.date
         if '发货时间' in hist_df.columns:
-            hist_df['发货시간'] = pd.to_datetime(clean_date_str(hist_df['发货时间']), errors='coerce')
+            hist_df['发货시간'] = pd.to_datetime(clean_date_str(hist_df['发货时间']), errors='coerce', format='mixed')
             hist_df['发货일자'] = hist_df['发货시간'].dt.date
             
     if not detail_df.empty:
         if '审核时间' in detail_df.columns:
-            detail_df['접수시간'] = pd.to_datetime(clean_date_str(detail_df['审核时间']), errors='coerce')
+            detail_df['접수시간'] = pd.to_datetime(clean_date_str(detail_df['审核时间']), errors='coerce', format='mixed')
             detail_df['접수일자'] = pd.to_datetime(detail_df['审核时间'], errors='coerce', format='mixed').dt.date
         if '发货时间' in detail_df.columns:
-            detail_df['发货시간'] = pd.to_datetime(clean_date_str(detail_df['发货时间']), errors='coerce')
+            detail_df['发货시간'] = pd.to_datetime(clean_date_str(detail_df['发货时间']), errors='coerce', format='mixed')
             detail_df['发货일자'] = detail_df['发货시간'].dt.date
         if '货品总数量' in detail_df.columns:
             detail_df['货品总数量'] = pd.to_numeric(detail_df['货品总数量'], errors='coerce').fillna(0)
@@ -243,7 +243,7 @@ def load_data(data_hash):
             if match and '审核时间' in temp_df.columns:
                 file_month = int(match.group(1))
                 # 审核时间이 해당 파일의 월과 일치하는 데이터만 남김 (월별 중복 다운로드 방지)
-                temp_time = pd.to_datetime(temp_df['审核时间'], errors='coerce')
+                temp_time = pd.to_datetime(temp_df['审核时间'], errors='coerce', format='mixed')
                 temp_df = temp_df[temp_time.dt.month == file_month]
                 
             in_list.append(temp_df)
@@ -254,7 +254,7 @@ def load_data(data_hash):
     
     if not in_df.empty:
         if '审核时间' in in_df.columns:
-            in_df['입고시간'] = pd.to_datetime(in_df['审核时间'], errors='coerce')
+            in_df['입고시간'] = pd.to_datetime(in_df['审核时间'], errors='coerce', format='mixed')
             in_df['입고일자'] = pd.to_datetime(in_df['审核时间'], errors='coerce', format='mixed').dt.date
         for col in ['数量', '绩效箱数']:
             if col in in_df.columns:
@@ -277,7 +277,7 @@ def load_data(data_hash):
         
     cj_df = pd.concat(cj_list, ignore_index=True) if cj_list else pd.DataFrame()
     if not cj_df.empty and '집화일자' in cj_df.columns:
-        cj_df['집화일자'] = pd.to_datetime(cj_df['집화일자'], errors='coerce').dt.date
+        cj_df['집화일자'] = pd.to_datetime(cj_df['집화일자'], errors='coerce', format='mixed').dt.date
         
     qk_list = []
     for file in quick_files:
@@ -296,7 +296,7 @@ def load_data(data_hash):
         
     qk_df = pd.concat(qk_list, ignore_index=True) if qk_list else pd.DataFrame()
     if not qk_df.empty and '오더일자' in qk_df.columns:
-        qk_df['오더일자'] = pd.to_datetime(qk_df['오더일자'], errors='coerce').dt.date
+        qk_df['오더일자'] = pd.to_datetime(qk_df['오더일자'], errors='coerce', format='mixed').dt.date
 
     # 6. 오출고 내역 로드
     misship_files = glob.glob("data_misship/*.csv") + glob.glob("data_misship/*.xlsx") + glob.glob("data_misship/*.xls")
@@ -313,7 +313,7 @@ def load_data(data_hash):
         
     misship_df = pd.concat(ms_list, ignore_index=True) if ms_list else pd.DataFrame()
     if not misship_df.empty and '접수일' in misship_df.columns:
-        misship_df['접수일'] = pd.to_datetime(misship_df['접수일'], errors='coerce').dt.date
+        misship_df['접수일'] = pd.to_datetime(misship_df['접수일'], errors='coerce', format='mixed').dt.date
 
 
     # 6. 재고 현황(Inventory) 로드 (로케이션 제외, 최소 컬럼만 로드)
