@@ -1,0 +1,5 @@
+Empty DataFrame
+Columns: [raw, s1_nomixed, s2_mixed]
+Index: []
+June 2026 without mixed count: 6461
+June 2026 with mixed count: 6461

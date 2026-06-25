@@ -1,0 +1,2 @@
+June 2026 shape: (6461, 76)
+Shops in June 2026: ['EA_Taofenxiao', 'EA_Xiaohongshu', 'EA_Korea', 'BOX_Korea', 'EA_Qoo10', 'EA_Sample', 'BOX_Export', 'EA_Export', 'EA_Shopee']
