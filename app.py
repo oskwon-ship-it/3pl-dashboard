@@ -317,7 +317,6 @@ def load_data(data_hash):
 
 
     # 6. 재고 현황(Inventory) 로드 (로케이션 제외, 최소 컬럼만 로드)
-    import glob
     inv_files = glob.glob("data_inventory/*.csv") + glob.glob("data_inventory/*.xlsx") + glob.glob("data_inventory/*.xls")
     inv_use_cols = ['货品简称', '库存', '有效期', '距离到期天数']
     
