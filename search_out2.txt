@@ -1,0 +1,95 @@
+78: def apply_korean_date_format(fig):
+79: fig.update_xaxes(
+197: def clean_date_str(s):
+202: hist_df['접수시간'] = pd.to_datetime(clean_date_str(hist_df['审核时间']), errors='coerce', format='mixed')
+203: hist_df['접수일자'] = hist_df['접수시간'].dt.date
+205: hist_df['发货시간'] = pd.to_datetime(clean_date_str(hist_df['发货时间']), errors='coerce', format='mixed')
+206: hist_df['发货일자'] = hist_df['发货시간'].dt.date
+210: detail_df['접수시간'] = pd.to_datetime(clean_date_str(detail_df['审核时间']), errors='coerce', format='mixed')
+211: detail_df['접수일자'] = detail_df['접수시간'].dt.date
+213: detail_df['发货시간'] = pd.to_datetime(clean_date_str(detail_df['发货时间']), errors='coerce', format='mixed')
+214: detail_df['发货일자'] = detail_df['发货시간'].dt.date
+246: temp_time = pd.to_datetime(temp_df['审核时间'], errors='coerce', format='mixed')
+257: in_df['입고시간'] = pd.to_datetime(in_df['审核时间'], errors='coerce', format='mixed')
+258: in_df['입고일자'] = pd.to_datetime(in_df['审核时间'], errors='coerce', format='mixed').dt.date
+280: cj_df['집화일자'] = pd.to_datetime(cj_df['집화일자'], errors='coerce', format='mixed').dt.date
+299: qk_df['오더일자'] = pd.to_datetime(qk_df['오더일자'], errors='coerce', format='mixed').dt.date
+316: misship_df['접수일'] = pd.to_datetime(misship_df['접수일'], errors='coerce', format='mixed').dt.date
+373: import datetime
+374: min_date = min(valid_mins) if valid_mins else datetime.date.today()
+375: max_date = max(valid_maxs) if valid_maxs else datetime.date.today()
+377: with st.expander("📅 조회 기간 설정", expanded=True):
+378: date_range = st.date_input("기준 기간을 선택하세요", value=(min_date, max_date), format="YYYY-MM-DD")
+380: if isinstance(date_range, tuple) and len(date_range) == 2:
+381: start_date, end_date = date_range
+383: start_date, end_date = min_date, max_date
+386: curr_in_df = in_df[(in_df['입고일자'] >= start_date) & (in_df['입고일자'] <= end_date)] if not in_df.empty and '입고일자' in in_df.columns else pd.DataFrame()
+387: curr_hist_df = hist_df[(hist_df['접수일자'] >= start_date) & (hist_df['접수일자'] <= end_date)] if not hist_df.empty and '접수일자' in hist_df.columns else pd.DataFrame()
+388: curr_detail_df = detail_df[(detail_df['접수일자'] >= start_date) & (detail_df['접수일자'] <= end_date)] if not detail_df.empty and '접수일자' in detail_df.columns else pd.DataFrame()
+390: curr_cj_df = cj_df[(cj_df['집화일자'] >= start_date) & (cj_df['집화일자'] <= end_date)] if not cj_df.empty and '집화일자' in cj_df.columns else pd.DataFrame()
+391: curr_qk_df = qk_df[(qk_df['오더일자'] >= start_date) & (qk_df['오더일자'] <= end_date)] if not qk_df.empty and '오더일자' in qk_df.columns else pd.DataFrame()
+392: curr_misship_df = misship_df[(misship_df['접수일'] >= start_date) & (misship_df['접수일'] <= end_date)] if not misship_df.empty and '접수일' in misship_df.columns else pd.DataFrame()
+394: # 전 기간(비교용) 필터링 (전월 동일 날짜 기준)
+395: prev_start_date = (pd.to_datetime(start_date) - pd.DateOffset(months=1)).date()
+396: prev_end_date = (pd.to_datetime(end_date) - pd.DateOffset(months=1)).date()
+398: prev_in_df = in_df[(in_df['입고일자'] >= prev_start_date) & (in_df['입고일자'] <= prev_end_date)] if not in_df.empty and '입고일자' in in_df.columns else pd.DataFrame()
+399: prev_hist_df = hist_df[(hist_df['접수일자'] >= prev_start_date) & (hist_df['접수일자'] <= prev_end_date)] if not hist_df.empty and '접수일자' in hist_df.columns else pd.DataFrame()
+400: prev_detail_df = detail_df[(detail_df['접수일자'] >= prev_start_date) & (detail_df['접수일자'] <= prev_end_date)] if not detail_df.empty and '접수일자' in detail_df.columns else pd.DataFrame()
+401: prev_misship_df = misship_df[(misship_df['접수일'] >= prev_start_date) & (misship_df['접수일'] <= prev_end_date)] if not misship_df.empty and '접수일' in misship_df.columns else pd.DataFrame()
+403: st.markdown(f"### 📊 센터 핵심 KPI ({start_date.strftime('%y.%m.%d')} ~ {end_date.strftime('%y.%m.%d')})")
+510: st.info("해당 기간의 출고 데이터가 없습니다.")
+521: fig_top_shops.update_layout(yaxis={'categoryorder':'total ascending'})
+540: fig_status.update_traces(textposition='inside', textinfo='percent+label')
+541: fig_status.update_layout(
+550: st.info("해당 기간에 오출고 데이터가 없습니다.")
+555: # Group all data (unfiltered by date_range, to show historical months) by Month
+560: in_monthly['월'] = pd.to_datetime(in_monthly['입고일자']).dt.to_period('M').astype(str)
+567: valid_out_monthly['월'] = pd.to_datetime(valid_out_monthly['접수일자']).dt.to_period('M').astype(str)
+590: fig_mom.update_layout(title="최근 6개월 입고 수량 및 출고 수량 비교", barmode='group')
+591: fig_mom.update_yaxes(title_text="입고 수량", secondary_y=False)
+592: fig_mom.update_yaxes(title_text="출고 수량", secondary_y=True)
+606: min_date = in_df['입고일자'].dropna().min()
+607: max_date = in_df['입고일자'].dropna().max()
+609: date_range = st.date_input("조회할 기간을 선택하세요", value=(min_date, max_date), format="YYYY-MM-DD")
+610: if isinstance(date_range, tuple) and len(date_range) == 2:
+611: start_date, end_date = date_range
+612: in_df = in_df[(in_df['입고일자'] >= start_date) & (in_df['입고일자'] <= end_date)]
+613: selected_period_text = f"{start_date.strftime('%Y-%m-%d')} ~ {end_date.strftime('%Y-%m-%d')}"
+615: selected_period_text = "전체 기간"
+638: # 입고 차트 1: 기간별 트렌드
+640: st.markdown("## 2️⃣ 기간별 입고 트렌드")
+642: in_trend['월(Month)'] = pd.to_datetime(in_trend['입고일자']).dt.strftime('%Y년 %m월')
+652: fig_in_day = apply_korean_date_format(fig_in_day)
+688: fig_brand.update_layout(yaxis={'categoryorder':'total ascending'})
+712: fig_brand_item.update_layout(yaxis={'categoryorder':'total ascending'}, margin=dict(l=0, r=0, t=30, b=0))
+730: min_date = hist_df['접수일자'].dropna().min()
+731: max_date = hist_df['접수일자'].dropna().max()
+733: date_range = st.date_input(
+734: "조회할 기간을 선택하세요",
+735: value=(min_date, max_date),
+739: if isinstance(date_range, tuple) and len(date_range) == 2:
+740: start_date, end_date = date_range
+741: hist_df = hist_df[(hist_df['접수일자'] >= start_date) & (hist_df['접수일자'] <= end_date)]
+743: detail_df = detail_df[(detail_df['접수일자'] >= start_date) & (detail_df['접수일자'] <= end_date)]
+744: selected_period_text = f"{start_date.strftime('%Y-%m-%d')} ~ {end_date.strftime('%Y-%m-%d')}"
+746: selected_period_text = "전체 기간"
+761: fig_shop_pie.update_layout(margin=dict(l=20, r=20, t=80, b=20), height=550)
+827: st.markdown("## 1️⃣ 기간별 주문 및 출고 트렌드")
+837: trend_all['날짜'] = pd.to_datetime(trend_all['날짜'])
+845: fig_month.update_xaxes(type='category')
+849: fig_day.update_layout(margin=dict(l=0, r=0, t=30, b=0))
+850: fig_day = apply_korean_date_format(fig_day)
+885: fig_network.update_layout(yaxis={'categoryorder':'total ascending'}, margin=dict(l=0, r=0, t=30, b=0))
+895: fig_brand.update_layout(margin=dict(l=0, r=0, t=30, b=0))
+911: fig_item.update_layout(yaxis={'categoryorder':'total ascending'})
+929: fig_brand_item.update_layout(yaxis={'categoryorder':'total ascending'}, margin=dict(l=0, r=0, t=30, b=0))
+959: fig_region.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
+997: fig_reg_prod.update_layout(yaxis={'categoryorder':'total ascending'}, margin=dict(l=0, r=0, t=30, b=0))
+1043: st.markdown("#### 🔄 재고 회전율 분석 (선택 상자 및 지정 기간 기반)")
+1045: # 독립적인 출고 기간 필터 (기본값: 상단 글로벌 필터 기간)
+1049: t_def_start = start_date if 'start_date' in locals() else t_min
+1050: t_def_end = end_date if 'end_date' in locals() else t_max
+1053: t_date_range = st.date_input("📊 재고 회전율 산출을 위한 출고 기간을 선택하세요", value=(t_def_start, t_def_end), format="YYYY-MM-DD", key="turn_date")
+1055: t_date_range = None
+1057: if t_date_range and isinstance(t_date_range, tuple) and len(t_date_range) == 2:
+1058: t_start, t_end = t_date_range

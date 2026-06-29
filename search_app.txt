@@ -1,0 +1,18 @@
+357: view_mode = st.radio(
+362: if view_mode == '👑 대표님 보고용 (Internal View)':
+378: date_range = st.date_input("기준 기간을 선택하세요", value=(min_date, max_date), format="YYYY-MM-DD")
+380: if isinstance(date_range, tuple) and len(date_range) == 2:
+381: start_date, end_date = date_range
+555: # Group all data (unfiltered by date_range, to show historical months) by Month
+609: date_range = st.date_input("조회할 기간을 선택하세요", value=(min_date, max_date), format="YYYY-MM-DD")
+610: if isinstance(date_range, tuple) and len(date_range) == 2:
+611: start_date, end_date = date_range
+724: if view_mode == '💼 고객사 배포용 (Client View)':
+733: date_range = st.date_input(
+739: if isinstance(date_range, tuple) and len(date_range) == 2:
+740: start_date, end_date = date_range
+752: if view_mode == '💼 고객사 배포용 (Client View)':
+1053: t_date_range = st.date_input("📊 재고 회전율 산출을 위한 출고 기간을 선택하세요", value=(t_def_start, t_def_end), format="YYYY-MM-DD", key="turn_date")
+1055: t_date_range = None
+1057: if t_date_range and isinstance(t_date_range, tuple) and len(t_date_range) == 2:
+1058: t_start, t_end = t_date_range

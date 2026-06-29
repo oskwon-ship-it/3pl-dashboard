@@ -1,0 +1,4 @@
+172: hist_unique = hist_df.drop_duplicates(subset=['出库单号'])
+882: network_summary = valid_shop_detail.drop_duplicates(subset=['出库单号']).groupby('고객네트워크').size().reset_index(name='주문건수')
+943: region_summary = valid_shop_detail.drop_duplicates(subset=['出库单号']).groupby('지역(省)').size().reset_index(name='주문건수')
+1084: name_map = inv_df.drop_duplicates('货品简称').set_index('货品简称')['바코드 - 상품명']

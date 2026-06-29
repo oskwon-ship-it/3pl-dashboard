@@ -722,34 +722,25 @@ if not hist_df.empty or not in_df.empty:
         st.stop()
     
     if view_mode == '💼 고객사 배포용 (Client View)':
-        st.sidebar.markdown("---")
-        client_menu = st.sidebar.radio(
-            "📂 세부 메뉴 선택", 
-            ["📊 1. 주문 소화 현황 (주문 접수일 기준)", "📦 2. 물동량 상세 분석 (실제 발송일 기준)"]
-        )
-        
         raw_client_hist_df = hist_df.copy()
         raw_client_detail_df = detail_df.copy()
         
         with st.expander("📅 출고 데이터 필터", expanded=True):
-            date_col = '접수일자' if client_menu == "📊 1. 주문 소화 현황 (주문 접수일 기준)" else '发货일자'
-            date_label = "주문 접수일 기준 조회 기간 선택" if date_col == '접수일자' else "실제 발송일 기준 조회 기간 선택"
-            
-            if date_col in hist_df.columns:
-                min_date = hist_df[date_col].dropna().min()
-                max_date = hist_df[date_col].dropna().max()
+            if '접수일자' in hist_df.columns:
+                min_date = hist_df['접수일자'].dropna().min()
+                max_date = hist_df['접수일자'].dropna().max()
                 
                 date_range = st.date_input(
-                    date_label, 
+                    "조회할 기간을 선택하세요", 
                     value=(min_date, max_date),
                     format="YYYY-MM-DD"
                 )
                 
                 if isinstance(date_range, tuple) and len(date_range) == 2:
                     start_date, end_date = date_range
-                    hist_df = hist_df[(hist_df[date_col] >= start_date) & (hist_df[date_col] <= end_date)]
-                    if not detail_df.empty and date_col in detail_df.columns:
-                        detail_df = detail_df[(detail_df[date_col] >= start_date) & (detail_df[date_col] <= end_date)]
+                    hist_df = hist_df[(hist_df['접수일자'] >= start_date) & (hist_df['접수일자'] <= end_date)]
+                    if not detail_df.empty and '접수일자' in detail_df.columns:
+                        detail_df = detail_df[(detail_df['접수일자'] >= start_date) & (detail_df['접수일자'] <= end_date)]
                     selected_period_text = f"{start_date.strftime('%Y-%m-%d')} ~ {end_date.strftime('%Y-%m-%d')}"
                 else:
                     selected_period_text = "전체 기간"
@@ -774,176 +765,173 @@ if not hist_df.empty or not in_df.empty:
                 shop_hist = hist_df[hist_df['店铺'] == selected_shop]
                 shop_detail = detail_df[detail_df['店铺'] == selected_shop] if not detail_df.empty and '店铺' in detail_df.columns else pd.DataFrame()
                 
-                if client_menu == "📊 1. 주문 소화 현황 (주문 접수일 기준)":
-                    st.subheader(f"[{selected_shop}] 핵심 출고 지표")
+                st.subheader(f"[{selected_shop}] 핵심 출고 지표")
+                
+                # 모바일 최적화: 2x3 그리드로 배치
+                kpi1, kpi2, kpi3 = st.columns(3)
+                kpi4, kpi5, kpi6 = st.columns(3)
+                
+                # --- KPI 산출 로직 (History 마스터 기준) ---
+                total_orders = len(shop_hist)
+                
+                cancel_mask = pd.Series(False, index=shop_hist.index)
+                if '发货状态' in shop_hist.columns:
+                    cancel_mask = shop_hist['发货状态'].isna() | (shop_hist['发货状态'].astype(str).str.strip() == '')
+                
+                if '发货时间' in shop_hist.columns:
+                    bad_time_mask = shop_hist['发货时间'].astype(str).str.contains('0000-00-00', na=False)
+                    cancel_mask = cancel_mask | bad_time_mask
                     
-                    # 모바일 최적화: 2x3 그리드로 배치
-                    kpi1, kpi2, kpi3 = st.columns(3)
-                    kpi4, kpi5, kpi6 = st.columns(3)
+                canceled_count = int(cancel_mask.sum())
+                
+                pending_mask = pd.Series(False, index=shop_hist.index)
+                if '发货시간' in shop_hist.columns:
+                    pending_mask = shop_hist['发货시간'].isna() & ~cancel_mask
                     
-                    # --- KPI 산출 로직 (History 마스터 기준) ---
-                    total_orders = len(shop_hist)
+                pending_count = int(pending_mask.sum())
+                
+                dispatched_mask = ~cancel_mask & ~pending_mask
+                dispatched_count = int(dispatched_mask.sum())
+                
+                # 지연 출고(Delayed) 판단: 출고는 완료되었으나 접수일자보다 늦게 발송된 경우
+                delayed_mask = pd.Series(False, index=shop_hist.index)
+                if '发货일자' in shop_hist.columns and '접수일자' in shop_hist.columns:
+                    delayed_mask = dispatched_mask & (shop_hist['发货일자'] > shop_hist['접수일자'])
+                delayed_count = int(delayed_mask.sum())
+                
+                if '出库单号' in shop_hist.columns:
+                    valid_order_ids = shop_hist.loc[dispatched_mask, '出库单号'].unique()
+                    valid_shop_detail = shop_detail[shop_detail['出库单号'].isin(valid_order_ids)] if not shop_detail.empty else shop_detail
+                else:
+                    valid_shop_detail = shop_detail
+                
+                if '货品数量' in shop_hist.columns:
+                    shop_hist_qty = pd.to_numeric(shop_hist.loc[dispatched_mask, '货品数量'], errors='coerce').fillna(0)
+                    total_qty = shop_hist_qty.sum()
+                else:
+                    total_qty = 0
+                
+                kpi1.metric("총 접수 건수", f"{total_orders:,.0f} 건")
+                kpi2.metric("출고 완료", f"{dispatched_count:,.0f} 건")
+                kpi3.metric("총 발송수량", f"{total_qty:,.0f} 개")
+                kpi4.metric("주문 취소", f"{canceled_count:,.0f} 건")
+                kpi5.metric("미출고 (발송대기)", f"{pending_count:,.0f} 건")
+                kpi6.metric("지연 출고 (익일이후)", f"{delayed_count:,.0f} 건")
+                
+                st.divider()
+                
+                # --- 차트 시각화 영역 (취소 및 미출고가 제외된 valid_shop_detail 사용) ---
+                
+                # 1. 월별 및 일별 주문/출고 트렌드
+                if '접수일자' in shop_hist.columns and '发货일자' in shop_hist.columns:
+                    st.markdown("## 1️⃣ 기간별 주문 및 출고 트렌드")
                     
-                    cancel_mask = pd.Series(False, index=shop_hist.index)
-                    if '发货状态' in shop_hist.columns:
-                        cancel_mask = shop_hist['发货状态'].isna() | (shop_hist['发货状态'].astype(str).str.strip() == '')
+                    recv_all = shop_hist.groupby('접수일자').size().reset_index(name='접수건수')
+                    recv_all.rename(columns={'접수일자': '날짜'}, inplace=True)
                     
-                    if '发货时间' in shop_hist.columns:
-                        bad_time_mask = shop_hist['发货时间'].astype(str).str.contains('0000-00-00', na=False)
-                        cancel_mask = cancel_mask | bad_time_mask
-                        
-                    canceled_count = int(cancel_mask.sum())
+                    valid_dispatch = shop_hist[dispatched_mask]
+                    disp_all = valid_dispatch.groupby('发货일자').size().reset_index(name='출고건수(완료)')
+                    disp_all.rename(columns={'发货일자': '날짜'}, inplace=True)
                     
-                    pending_mask = pd.Series(False, index=shop_hist.index)
-                    if '发货시간' in shop_hist.columns:
-                        pending_mask = shop_hist['发货시간'].isna() & ~cancel_mask
-                        
-                    pending_count = int(pending_mask.sum())
+                    trend_all = pd.merge(recv_all, disp_all, on='날짜', how='outer').fillna(0).sort_values('날짜')
+                    trend_all['날짜'] = pd.to_datetime(trend_all['날짜'])
+                    trend_all['월(Month)'] = trend_all['날짜'].dt.strftime('%Y년 %m월')
                     
-                    dispatched_mask = ~cancel_mask & ~pending_mask
-                    dispatched_count = int(dispatched_mask.sum())
+                    monthly_trend = trend_all.groupby('월(Month)')[['접수건수', '출고건수(완료)']].sum().reset_index()
                     
-                    # 지연 출고(Delayed) 판단: 출고는 완료되었으나 접수일자보다 늦게 발송된 경우
-                    delayed_mask = pd.Series(False, index=shop_hist.index)
-                    if '发货일자' in shop_hist.columns and '접수일자' in shop_hist.columns:
-                        delayed_mask = dispatched_mask & (shop_hist['发货일자'] > shop_hist['접수일자'])
-                    delayed_count = int(delayed_mask.sum())
-                    
-                    if '出库单号' in shop_hist.columns:
-                        valid_order_ids = shop_hist.loc[dispatched_mask, '出库单号'].unique()
-                        valid_shop_detail = shop_detail[shop_detail['出库单号'].isin(valid_order_ids)] if not shop_detail.empty else shop_detail
-                    else:
-                        valid_shop_detail = shop_detail
-                    
-                    if '货品数量' in shop_hist.columns:
-                        shop_hist_qty = pd.to_numeric(shop_hist.loc[dispatched_mask, '货品数量'], errors='coerce').fillna(0)
-                        total_qty = shop_hist_qty.sum()
-                    else:
-                        total_qty = 0
-                    
-                    kpi1.metric("총 접수 건수", f"{total_orders:,.0f} 건")
-                    kpi2.metric("출고 완료", f"{dispatched_count:,.0f} 건")
-                    kpi3.metric("총 발송수량", f"{total_qty:,.0f} 개")
-                    kpi4.metric("주문 취소", f"{canceled_count:,.0f} 건")
-                    kpi5.metric("미출고 (발송대기)", f"{pending_count:,.0f} 건")
-                    kpi6.metric("지연 출고 (익일이후)", f"{delayed_count:,.0f} 건")
+                    t1, t2 = st.tabs(["📅 월별 요약", "📆 일별 상세"])
+                    with t1:
+                        fig_month = px.bar(monthly_trend, x='월(Month)', y=['접수건수', '출고건수(완료)'], barmode='group', text_auto=True)
+                        fig_month.update_xaxes(type='category')
+                        st.plotly_chart(fig_month, use_container_width=True)
+                    with t2:
+                        fig_day = px.bar(trend_all, x='날짜', y=['접수건수', '출고건수(완료)'], barmode='group')
+                        fig_day.update_layout(margin=dict(l=0, r=0, t=30, b=0))
+                        fig_day = apply_korean_date_format(fig_day)
+                        st.plotly_chart(fig_day, use_container_width=True)
                     
                     st.divider()
                 
-                if client_menu == "📊 1. 주문 소화 현황 (주문 접수일 기준)":
-                    # --- 차트 시각화 영역 (취소 및 미출고가 제외된 valid_shop_detail 사용) ---
+                # 2. 고객 네트워크별 데이터
+                if not valid_shop_detail.empty:
+                    # 상점별로 네트워크 기준 컬럼을 다르게 적용
+                    has_network_data = False
                     
-                    # 1. 월별 및 일별 주문/출고 트렌드
-                    if '접수일자' in shop_hist.columns and '发货일자' in shop_hist.columns:
-                        st.markdown("## 1️⃣ 기간별 주문 및 출고 트렌드")
-                        
-                        recv_all = shop_hist.groupby('접수일자').size().reset_index(name='접수건수')
-                        recv_all.rename(columns={'접수일자': '날짜'}, inplace=True)
-                        
-                        valid_dispatch = shop_hist[dispatched_mask]
-                        disp_all = valid_dispatch.groupby('发货일자').size().reset_index(name='출고건수(완료)')
-                        disp_all.rename(columns={'发货일자': '날짜'}, inplace=True)
-                        
-                        trend_all = pd.merge(recv_all, disp_all, on='날짜', how='outer').fillna(0).sort_values('날짜')
-                        trend_all['날짜'] = pd.to_datetime(trend_all['날짜'])
-                        trend_all['월(Month)'] = trend_all['날짜'].dt.strftime('%Y년 %m월')
-                        
-                        monthly_trend = trend_all.groupby('월(Month)')[['접수건수', '출고건수(완료)']].sum().reset_index()
-                        
-                        t1, t2 = st.tabs(["📅 월별 요약", "📆 일별 상세"])
-                        with t1:
-                            fig_month = px.bar(monthly_trend, x='월(Month)', y=['접수건수', '출고건수(완료)'], barmode='group', text_auto=True)
-                            fig_month.update_xaxes(type='category')
-                            st.plotly_chart(fig_month, use_container_width=True)
-                        with t2:
-                            fig_day = px.bar(trend_all, x='날짜', y=['접수건수', '출고건수(완료)'], barmode='group')
-                            fig_day.update_layout(margin=dict(l=0, r=0, t=30, b=0))
-                            fig_day = apply_korean_date_format(fig_day)
-                            st.plotly_chart(fig_day, use_container_width=True)
-                        
-                        st.divider()
-                    
-                    # 2. 고객 네트워크별 데이터
-                    if not valid_shop_detail.empty:
-                        # 상점별로 네트워크 기준 컬럼을 다르게 적용
-                        has_network_data = False
-                        
-                        if selected_shop == 'BOX_Export' and '客服备注' in valid_shop_detail.columns:
-                            valid_shop_detail['고객네트워크'] = valid_shop_detail['客服备注'].fillna('기재안됨')
-                            has_network_data = True
-                        elif '客户网名' in valid_shop_detail.columns:
-                            if selected_shop == 'B2C':
-                                def map_network(name):
-                                    name_str = str(name)
-                                    if 'Sunmooh韩国直邮' in name_str:
-                                        return 'Sunmooh'
-                                    elif '慧敏欧尼韩国直邮' in name_str:
-                                        return '킵텐'
-                                    elif 'EA_Xiaohongshu' in name_str or 'HAUL41小红书' in name_str or '샤오홍수' in name_str:
-                                        return '샤오홍슈'
-                                    else:
-                                        return '대리'
-                                valid_shop_detail['고객네트워크'] = valid_shop_detail['客户网名'].apply(map_network)
-                            else:
-                                valid_shop_detail['고객네트워크'] = valid_shop_detail['客户网名'].fillna('기재안됨')
-                            has_network_data = True
-                            
-                        if has_network_data:
-                            st.markdown("## 2️⃣ 고객 네트워크별 데이터 (출고 완료 기준)")
-                            network_summary = valid_shop_detail.drop_duplicates(subset=['出库单号']).groupby('고객네트워크').size().reset_index(name='주문건수')
-                            top_networks = network_summary.nlargest(10, '주문건수')
-                            fig_network = px.bar(top_networks, x='주문건수', y='고객네트워크', orientation='h', color='주문건수', color_continuous_scale='Teal')
-                            fig_network.update_layout(yaxis={'categoryorder':'total ascending'}, margin=dict(l=0, r=0, t=30, b=0))
-                            st.plotly_chart(fig_network, use_container_width=True)
-                            st.divider()
-
-                if client_menu == "📦 2. 물동량 상세 분석 (실제 발송일 기준)":
-                    # 3. 브랜드별 출고 순위
-                    if not valid_shop_detail.empty and '品牌' in valid_shop_detail.columns:
-                        st.markdown("## 3️⃣ 브랜드별 출고 순위 (출고 완료 기준)")
-                        brand_summary = valid_shop_detail.groupby('品牌')['货品总数量'].sum().reset_index(name='총출고수량')
-                        brand_summary = brand_summary.sort_values('총출고수량', ascending=False)
-                        fig_brand = px.bar(brand_summary.head(15), x='品牌', y='총출고수량', color='총출고수량', color_continuous_scale='Magma', text_auto=True)
-                        fig_brand.update_layout(margin=dict(l=0, r=0, t=30, b=0))
-                        st.plotly_chart(fig_brand, use_container_width=True)
-                        st.divider()
-                        
-                    # 4. 상품별 출고
-                    if not valid_shop_detail.empty and '货品简称' in valid_shop_detail.columns and '货品总数量' in valid_shop_detail.columns:
-                        st.markdown("## 4️⃣ 상품별 출고 현황 (베스트셀러 Top 15)")
-                        
-                        if '货品编号' in valid_shop_detail.columns:
-                            valid_shop_detail['상품표시명'] = valid_shop_detail['货品编号'].astype(str) + " - " + valid_shop_detail['货品简称'].astype(str)
+                    if selected_shop == 'BOX_Export' and '客服备注' in valid_shop_detail.columns:
+                        valid_shop_detail['고객네트워크'] = valid_shop_detail['客服备注'].fillna('기재안됨')
+                        has_network_data = True
+                    elif '客户网名' in valid_shop_detail.columns:
+                        if selected_shop == 'B2C':
+                            def map_network(name):
+                                name_str = str(name)
+                                if 'Sunmooh韩国直邮' in name_str:
+                                    return 'Sunmooh'
+                                elif '慧敏欧尼韩国直邮' in name_str:
+                                    return '킵텐'
+                                elif 'EA_Xiaohongshu' in name_str or 'HAUL41小红书' in name_str or '샤오홍수' in name_str:
+                                    return '샤오홍슈'
+                                else:
+                                    return '대리'
+                            valid_shop_detail['고객네트워크'] = valid_shop_detail['客户网名'].apply(map_network)
                         else:
-                            valid_shop_detail['상품표시명'] = valid_shop_detail['货品简称']
-                            
-                        item_summary = valid_shop_detail.groupby('상품표시명')['货品总数量'].sum().reset_index()
-                        top_items = item_summary.nlargest(15, '货品总数量')
-                        fig_item = px.bar(top_items, x='货品总数量', y='상품표시명', orientation='h', labels={'상품표시명':'바코드 - 상품명'})
-                        fig_item.update_layout(yaxis={'categoryorder':'total ascending'})
-                        st.plotly_chart(fig_item, use_container_width=True)
+                            valid_shop_detail['고객네트워크'] = valid_shop_detail['客户网名'].fillna('기재안됨')
+                        has_network_data = True
+                        
+                    if has_network_data:
+                        st.markdown("## 2️⃣ 고객 네트워크별 데이터 (출고 완료 기준)")
+                        network_summary = valid_shop_detail.drop_duplicates(subset=['出库单号']).groupby('고객네트워크').size().reset_index(name='주문건수')
+                        top_networks = network_summary.nlargest(10, '주문건수')
+                        fig_network = px.bar(top_networks, x='주문건수', y='고객네트워크', orientation='h', color='주문건수', color_continuous_scale='Teal')
+                        fig_network.update_layout(yaxis={'categoryorder':'total ascending'}, margin=dict(l=0, r=0, t=30, b=0))
+                        st.plotly_chart(fig_network, use_container_width=True)
                         st.divider()
+
+                # 3. 브랜드별 출고 순위
+                if not valid_shop_detail.empty and '品牌' in valid_shop_detail.columns:
+                    st.markdown("## 3️⃣ 브랜드별 출고 순위 (출고 완료 기준)")
+                    brand_summary = valid_shop_detail.groupby('品牌')['货品总数量'].sum().reset_index(name='총출고수량')
+                    brand_summary = brand_summary.sort_values('총출고수량', ascending=False)
+                    fig_brand = px.bar(brand_summary.head(15), x='品牌', y='총출고수량', color='총출고수량', color_continuous_scale='Magma', text_auto=True)
+                    fig_brand.update_layout(margin=dict(l=0, r=0, t=30, b=0))
+                    st.plotly_chart(fig_brand, use_container_width=True)
+                    st.divider()
+                    
+                # 4. 상품별 출고
+                if not valid_shop_detail.empty and '货品简称' in valid_shop_detail.columns and '货品总数量' in valid_shop_detail.columns:
+                    st.markdown("## 4️⃣ 상품별 출고 현황 (베스트셀러 Top 15)")
+                    
+                    if '货品编号' in valid_shop_detail.columns:
+                        valid_shop_detail['상품표시명'] = valid_shop_detail['货品编号'].astype(str) + " - " + valid_shop_detail['货品简称'].astype(str)
+                    else:
+                        valid_shop_detail['상품표시명'] = valid_shop_detail['货品简称']
                         
-                    # 5. 특정 브랜드 상세 조회 (드롭다운)
-                    if not valid_shop_detail.empty and '品牌' in valid_shop_detail.columns and '货品简称' in valid_shop_detail.columns:
-                        st.markdown("## 5️⃣ 특정 브랜드 상세 상품 조회")
-                        brand_list = ["브랜드를 선택하세요"] + sorted(valid_shop_detail['品牌'].dropna().unique().tolist())
-                        selected_brand = st.selectbox("📌 상세 상품 내역을 확인할 브랜드를 선택해 주세요:", brand_list)
+                    item_summary = valid_shop_detail.groupby('상품표시명')['货品总数量'].sum().reset_index()
+                    top_items = item_summary.nlargest(15, '货品总数量')
+                    fig_item = px.bar(top_items, x='货品总数量', y='상품표시명', orientation='h', labels={'상품표시명':'바코드 - 상품명'})
+                    fig_item.update_layout(yaxis={'categoryorder':'total ascending'})
+                    st.plotly_chart(fig_item, use_container_width=True)
+                    st.divider()
+                    
+                # 5. 특정 브랜드 상세 조회 (드롭다운)
+                if not valid_shop_detail.empty and '品牌' in valid_shop_detail.columns and '货品简称' in valid_shop_detail.columns:
+                    st.markdown("## 5️⃣ 특정 브랜드 상세 상품 조회")
+                    brand_list = ["브랜드를 선택하세요"] + sorted(valid_shop_detail['品牌'].dropna().unique().tolist())
+                    selected_brand = st.selectbox("📌 상세 상품 내역을 확인할 브랜드를 선택해 주세요:", brand_list)
+                    
+                    if selected_brand != "브랜드를 선택하세요":
+                        target_prod_df = valid_shop_detail[valid_shop_detail['品牌'] == selected_brand]
+                        st.markdown(f"**📦 '{selected_brand}' 상세 상품별 출고 수량**")
                         
-                        if selected_brand != "브랜드를 선택하세요":
-                            target_prod_df = valid_shop_detail[valid_shop_detail['品牌'] == selected_brand]
-                            st.markdown(f"**📦 '{selected_brand}' 상세 상품별 출고 수량**")
-                            
-                            brand_item_summary = target_prod_df.groupby('상품표시명')['货品总数量'].sum().reset_index()
-                            brand_item_summary = brand_item_summary.sort_values('货品总数量', ascending=False)
-                            
-                            fig_brand_item = px.bar(brand_item_summary, x='货品总数量', y='상품표시명', orientation='h', labels={'상품표시명':'바코드 - 상품명', '货品总数量':'출고수량'}, color='货品总数量', color_continuous_scale='Blues')
-                            fig_brand_item.update_layout(yaxis={'categoryorder':'total ascending'}, margin=dict(l=0, r=0, t=30, b=0))
-                            st.plotly_chart(fig_brand_item, use_container_width=True)
-                            
-                            # 표 형태로도 데이터 제공
-                            st.dataframe(brand_item_summary.rename(columns={'상품표시명':'상품명', '货品总数量':'출고수량(개)'}), use_container_width=True, hide_index=True)
-                            st.divider()
+                        brand_item_summary = target_prod_df.groupby('상품표시명')['货品总数量'].sum().reset_index()
+                        brand_item_summary = brand_item_summary.sort_values('货品总数量', ascending=False)
+                        
+                        fig_brand_item = px.bar(brand_item_summary, x='货品总数量', y='상품표시명', orientation='h', labels={'상품표시명':'바코드 - 상품명', '货品总数量':'출고수량'}, color='货品总数量', color_continuous_scale='Blues')
+                        fig_brand_item.update_layout(yaxis={'categoryorder':'total ascending'}, margin=dict(l=0, r=0, t=30, b=0))
+                        st.plotly_chart(fig_brand_item, use_container_width=True)
+                        
+                        # 표 형태로도 데이터 제공
+                        st.dataframe(brand_item_summary.rename(columns={'상품표시명':'상품명', '货品总数量':'출고수량(개)'}), use_container_width=True, hide_index=True)
+                        st.divider()
 
                 # 6. 지역별 배송 목적지 현황 (중국 지도 히트맵)
                 if not valid_shop_detail.empty and '省市区' in valid_shop_detail.columns:
