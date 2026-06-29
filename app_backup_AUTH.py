@@ -4,43 +4,6 @@ import plotly.express as px
 import glob
 import os
 
-import yaml
-from yaml.loader import SafeLoader
-import streamlit_authenticator as stauth
-
-# Load configuration
-try:
-    with open('config.yaml', 'r', encoding='utf-8') as file:
-        config = yaml.load(file, Loader=SafeLoader)
-except FileNotFoundError:
-    st.error("config.yaml 파일이 없습니다.")
-    st.stop()
-
-# Initialize authenticator
-authenticator = stauth.Authenticate(
-    config['credentials'],
-    config['cookie']['name'],
-    config['cookie']['key'],
-    config['cookie']['expiry_days'],
-    config['preauthorized']
-)
-
-# Render login widget
-authenticator.login()
-
-# Check authentication status
-if st.session_state.get("authentication_status") is False:
-    st.error('아이디 또는 비밀번호가 잘못되었습니다.')
-    st.stop()
-elif st.session_state.get("authentication_status") is None:
-    st.warning('계속하려면 로그인을 해주세요.')
-    st.stop()
-
-# If authenticated, show logout button in sidebar and welcome message
-authenticator.logout('로그아웃', 'sidebar')
-st.sidebar.markdown(f'**{st.session_state["name"]}** 님 환영합니다! 🎉')
-st.sidebar.divider()
-
 st.set_page_config(page_title="3PL 맞춤형 대시보드", page_icon="📦", layout="wide")
 
 custom_css = '''
@@ -391,17 +354,10 @@ if not hist_df.empty or not in_df.empty:
                 ('📦 출고 대시보드 (Outbound)', '📥 입고 대시보드 (Inbound)')
             )
         with col2:
-            current_user = st.session_state.get("username", "")
-            user_role = config['credentials']['usernames'].get(current_user, {}).get('role', 'client')
-            
-            if user_role == 'admin':
-                view_mode = st.radio(
-                    "어떤 용도의 대시보드를 보시겠습니까?",
-                    ('💼 고객사 배포용 (Client View)', '👑 대표님 보고용 (Internal View)')
-                )
-            else:
-                st.info("💼 고객사 전용 리포트 모드로 접속되었습니다.")
-                view_mode = '💼 고객사 배포용 (Client View)'
+            view_mode = st.radio(
+                "어떤 용도의 대시보드를 보시겠습니까?",
+                ('💼 고객사 배포용 (Client View)', '👑 대표님 보고용 (Internal View)')
+            )
             
     if view_mode == '👑 대표님 보고용 (Internal View)':
         st.title("👑 3PL 종합 운영 리포트 (Internal View)")
