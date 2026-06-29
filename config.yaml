@@ -9,8 +9,8 @@ credentials:
       name: 관리자(대표님)
       password: $2b$12$6z2rTtwhF.xZJC4PQ7sVvumnnGCepLynCmfGlvZx4svog9LSH7rWS
       role: admin
-    client:
-      email: mycommerce@example.com
+    client:#mycommerce
+      email: client@example.com
       name: 고객사
       password: $2b$12$yKFOWVr.iWz0vLPH58qmzOBQVxhmwaWbVX1Itng5tdjgLRIe7QR.W
       role: client
