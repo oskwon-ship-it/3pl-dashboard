@@ -11,7 +11,7 @@ credentials:
       role: admin
     mycommerce:
       email: client@example.com
-      name: 고객사
+      name: 마이커머스
       password: $2b$12$yKFOWVr.iWz0vLPH58qmzOBQVxhmwaWbVX1Itng5tdjgLRIe7QR.W
       role: client
 preauthorized:
